@@ -24,8 +24,9 @@ def register():
     password = data.get('password')
     first_name = data.get('first_name')
     last_name = data.get('last_name')
+    role = data.get('role')
 
-    if not all([email, password, first_name, last_name]):
+    if not all([email, password, first_name, last_name, role]):
         return jsonify({"message": "All fields are required."}), 400
 
     try:
@@ -40,9 +41,15 @@ def register():
 
         cur.execute("INSERT INTO \"user\" (email, first_name, last_name) VALUES (%s, %s, %s)",
                     (email, first_name, last_name))
-        cur.execute("INSERT INTO user_auth (email, password_hash) VALUES (%s, %s)",
-                    (email, password_hash))
-
+        cur.execute("INSERT INTO user_auth (email, password_hash, role) VALUES (%s, %s, %s)",
+                    (email, password_hash, role))
+        
+        if role == "agent":
+            cur.execute("INSERT INTO agent (email, job_title, real_estate_agency) VALUES (%s, %s, %s)",
+                        (email, '', '')) 
+        elif role == "renter":
+            cur.execute("INSERT INTO prospective_renter (email, desired_move_in_date, budget) VALUES (%s, %s, %s)",
+                        (email, None, None)) 
         conn.commit()
         cur.close()
         conn.close()
