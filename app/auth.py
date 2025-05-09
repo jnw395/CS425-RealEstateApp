@@ -141,4 +141,43 @@ def logout():
 def login_page():
     return send_from_directory('static', 'login.html')
 
+#Login -------------------------------------------------------------------------------------
+@auth.route('/api/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    email = data.get('email') 
+    password = data.get('password')
+
+    if not email or not password:
+        return jsonify({"message": "Email and password required."}), 400
+    
+    try:
+        conn = psycopg2.connect(**DB_PARAMS) # Connect to database
+        cur = conn.cursor()
+
+        # Get password and role
+        cur.execute("SELECT password_hash, role FROM ")
+        result = cur.fetchone()
+
+        if not result:
+            return jsonify({"message": "Invalid credientials."}), 401
+        
+
+        stored_hash, role = result
+        # Check if password matches
+        if not bcrypt.checkpw(password.encode(), stored_hash.encode()):
+            return jsonify({"message": "Invalid credientials."}), 401
+        
+        # Set session
+        session['user_email'] = email
+        session['user_role'] = role
+
+        return jsonify({"message": "Login successful.", "role":role})
+    
+    except Exception as e:
+        return jsonify({"message": f"Server error: {str(e)}"}), 500
+    
+    finally: # End connections
+        cur.close()
+        conn.close()
 
