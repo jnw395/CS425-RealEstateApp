@@ -120,95 +120,106 @@ def view_profile_page():
 def profile_page():
     return send_from_directory('static', 'edit-profile.html')
 
-@auth.route('/api/edit-profile')
+@auth.route('/api/profile', methods=['GET'])
 def get_profile():
-    email = session.get('user_email')
-    if not email:
-        return jsonify({'message': 'Not logged in'}), 401
+    if 'email' not in session:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    email = session['email']
+
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
-        cur.execute('SELECT first_name, last_name FROM "user" WHERE email = %s', (email,))
-        row = cur.fetchone()
+
+        cur.execute("""
+            SELECT u.email, u.first_name, u.last_name, ua.role
+            FROM "user" u
+            JOIN user_auth ua ON u.email = ua.email
+            WHERE u.email = %s
+        """, (email,))
+        user = cur.fetchone()
+
+        if not user:
+            return jsonify({"message": "User not found"}), 404
+
+        cur.execute("""
+            SELECT house_number, street, city, addr_state, zip_code
+            FROM address
+            WHERE email = %s
+        """, (email,))
+        addresses = cur.fetchall()
+
         cur.close()
         conn.close()
-        if row:
-            return jsonify({'first_name': row[0], 'last_name': row[1]})
-        else:
-            return jsonify({'message': 'User not found'}), 404
-    except Exception as e:
-        return jsonify({'message': f'Server error: {str(e)}'}), 500
 
-@auth.route('/api/edit-profile', methods=['POST'])
+        return jsonify({
+            "email": user[0],
+            "first_name": user[1],
+            "last_name": user[2],
+            "role": user[3],
+            "addresses": [
+                {
+                    "house_number": a[0],
+                    "street": a[1],
+                    "city": a[2],
+                    "addr_state": a[3],
+                    "zip_code": a[4]
+                } for a in addresses
+            ]
+        })
+
+    except Exception as e:
+        return jsonify({"message": f"Error: {str(e)}"}), 500
+
+
+@auth.route('/api/profile', methods=['POST'])
 def edit_profile():
+    if 'email' not in session:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    email = session['email']
     data = request.get_json()
-    current_email = data.get('current_email')
-    current_password = data.get('current_password')
+
     first_name = data.get('first_name')
     last_name = data.get('last_name')
-    new_email = data.get('new_email')
-    new_password = data.get('new_password')
-    credit_cards_to_add = data.get('credit_cards')
-    credit_cards_to_remove = data.get('remove_credit_cards')
-    addresses_to_add = data.get('addresses')
-    addresses_to_remove = data.get('remove_addresses')
-
-    if not current_email or not current_password:
-        return jsonify({"message": "Email and password are required."}), 400
+    addresses = data.get('addresses', [])
 
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
 
-        cur.execute("SELECT password FROM user_auth WHERE email = %s", (current_email,))
-        result = cur.fetchone()
-        
-        if not result or result[0] != current_password: # Compare plain text passwords
-            return jsonify({"message": "Incorrect email or password."}), 401
+        # Update name
+        cur.execute("""
+            UPDATE "user"
+            SET first_name = %s, last_name = %s
+            WHERE email = %s
+        """, (first_name, last_name, email))
 
-        if first_name or last_name:
-            cur.execute("UPDATE \"user\" SET first_name = %s, last_name = %s WHERE email = %s",
-                        (first_name, last_name, current_email))
+        # Delete old addresses
+        cur.execute("DELETE FROM address WHERE email = %s", (email,))
 
-        if new_email:
-            cur.execute("UPDATE \"user\" SET email = %s WHERE email = %s", (new_email, current_email))
-            cur.execute("UPDATE user_auth SET email = %s WHERE email = %s", (new_email, current_email))
-            current_email = new_email
-
-        if new_password:
-            # Store the plain text password (INSECURE!)
-            cur.execute("UPDATE user_auth SET password = %s WHERE email = %s", 
-                        (new_password, current_email))
-
-        if credit_cards_to_add:
-            for card in credit_cards_to_add:
-                cur.execute("INSERT INTO credit_cards (email, card_number, card_type, expiration_date) VALUES (%s, %s, %s, %s)",
-                            (current_email, card['card_number'], card['card_type'], card['expiration_date']))
-
-        if credit_cards_to_remove:
-            for card_id in credit_cards_to_remove:
-                cur.execute("DELETE FROM credit_cards WHERE card_id = %s AND email = %s", (card_id, current_email))
-
-        if addresses_to_add:
-            for address in addresses_to_add:
-                cur.execute("INSERT INTO address (email, address_line, city, state, postal_code, is_billing) VALUES (%s, %s, %s, %s, %s, %s)",
-                            (current_email, address['address_line'], address['city'], address['state'], address['postal_code'], address['is_billing']))
-
-        if addresses_to_remove:
-            for address_id in addresses_to_remove:
-                cur.execute("SELECT is_billing FROM addresses WHERE address_id = %s AND email = %s", (address_id, current_email))
-                result = cur.fetchone()
-                if result and result[0] == True:
-                    return jsonify({"message": "Cannot delete billing address before deleting associated credit card."}), 400
-                cur.execute("DELETE FROM addresses WHERE address_id = %s AND email = %s", (address_id, current_email))
+        # Insert new addresses
+        for addr in addresses:
+            cur.execute("""
+                INSERT INTO address (email, house_number, street, city, addr_state, zip_code)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                email,
+                addr['house_number'],
+                addr['street'],
+                addr['city'],
+                addr['addr_state'],
+                addr['zip_code']
+            ))
 
         conn.commit()
         cur.close()
         conn.close()
 
-        return jsonify({"message": "Profile updated successfully."})
+        return jsonify({"message": "Profile updated successfully"})
+
     except Exception as e:
-        return jsonify({"message": f"Server error: {str(e)}"}), 500
+        return jsonify({"message": f"Error: {str(e)}"}), 500
 
     
 
@@ -234,10 +245,13 @@ def profile_details():
         cur.execute('SELECT first_name, last_name FROM "user" WHERE email = %s', (email,))
         name_row = cur.fetchone()
 
-        cur.execute('SELECT card_number, cardholder_name, expiration_date FROM credit_card WHERE email = %s', (email,))
+        if not name_row:
+            return jsonify({'message': 'User not found'}), 404
+
+        cur.execute('SELECT card_number, expiration_date FROM credit_card WHERE email = %s', (email,))
         cards = cur.fetchall()
 
-        cur.execute('SELECT address_id, address_line FROM address WHERE email = %s', (email,))
+        cur.execute('SELECT house_number, street, city, addr_state, zip_code FROM address WHERE email = %s', (email,))
         addresses = cur.fetchall()
 
         cur.close()
@@ -247,14 +261,14 @@ def profile_details():
             'first_name': name_row[0],
             'last_name': name_row[1],
             'email': email,
-            'cards': [{'card_number': c[0], 'cardholder_name': c[1], 'expiration_date': c[2]} for c in cards],
-            'addresses': [{'address_id': a[0], 'address_line': a[1]} for a in addresses]
+            'cards': [{'card_number': c[0], 'expiration_date': c[1]} for c in cards],
+            'addresses': [{'house_number': a[0], 'street': a[1], 'city': a[2], 'addr_state': a[3], 'zip_code': a[4]} for a in addresses]
         })
     except Exception as e:
         return jsonify({'message': f'Server error: {str(e)}'}), 500
     
 #profile (agent)------------------------------------------------------------------------------------
-@auth.route('/api/agent/edit-profile', methods=['POST'])  # Agent-specific edit profile
+@auth.route('/api/agent/edit-profile', methods=['POST'])  
 def agent_edit_profile():
     data = request.get_json()
     current_email = data.get('current_email')
@@ -263,8 +277,8 @@ def agent_edit_profile():
     last_name = data.get('last_name')
     new_email = data.get('new_email')
     new_password = data.get('new_password')
-    job_title = data.get('job_title')        # Agent-specific field
-    real_estate_agency = data.get('real_estate_agency')  # Agent-specific field
+    job_title = data.get('job_title')        
+    real_estate_agency = data.get('real_estate_agency')  
 
     if not current_email or not current_password:
         return jsonify({"message": "Email and password are required."}), 400
@@ -293,8 +307,6 @@ def agent_edit_profile():
         if new_password:
             cur.execute("UPDATE user_auth SET password = %s WHERE email = %s", 
                         (new_password, current_email))
-
-        # Update agent-specific fields in "agent" table
         if job_title or real_estate_agency:
             cur.execute("UPDATE agent SET job_title = %s, real_estate_agency = %s WHERE email = %s",
                         (job_title, real_estate_agency, current_email))
@@ -307,18 +319,15 @@ def agent_edit_profile():
     except Exception as e:
         return jsonify({"message": f"Server error: {str(e)}"}), 500
     
-@auth.route('/api/agent/view-profile', methods=['GET'])  # Agent-specific view profile
+@auth.route('/api/agent/view-profile', methods=['GET'])  
 def agent_view_profile():
-    email = request.args.get('email')  # Get email from query parameters
-
+    email = request.args.get('email')  
     if not email:
         return jsonify({"message": "Email is required."}), 400
 
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
-
-        # Fetch data from "user" and "agent" tables
         cur.execute("SELECT u.email, u.first_name, u.last_name, a.job_title, a.real_estate_agency "
                     "FROM \"user\" u "
                     "JOIN agent a ON u.email = a.email "
@@ -328,7 +337,6 @@ def agent_view_profile():
         if not agent_data:
             return jsonify({"message": "Agent not found."}), 404
 
-        # Convert the tuple to a dictionary
         agent_dict = {
             'email': agent_data[0],
             'first_name': agent_data[1],
@@ -391,12 +399,21 @@ def delete_card():
 def add_address():
     email = session.get('user_email')
     data = request.get_json()
-    address_line = data.get('address_line')
 
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
-        cur.execute("INSERT INTO address (email, address_line) VALUES (%s, %s)", (email, address_line))
+        cur.execute("""
+            INSERT INTO address (email, house_number, street, city, addr_state, zip_code)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (
+            email,
+            data['house_number'],
+            data['street'],
+            data['city'],
+            data['addr_state'],
+            data['zip_code']
+        ))
         conn.commit()
         cur.close()
         conn.close()
@@ -404,27 +421,36 @@ def add_address():
     except Exception as e:
         return jsonify({"message": f"Error: {str(e)}"}), 500
 
+
 @auth.route('/api/delete-address', methods=['POST'])
 def delete_address():
     email = session.get('user_email')
     data = request.get_json()
-    address_id = data.get('address_id')
+    addr = data.get('address', {})
 
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
-        #makes sure address isn't linked to a cc
-        cur.execute("SELECT COUNT(*) FROM credit_card WHERE billing_address_id = %s", (address_id,))
-        if cur.fetchone()[0] > 0:
-            return jsonify({"message": "Cannot delete an address linked to a card."}), 400
 
-        cur.execute("DELETE FROM address WHERE email = %s AND address_id = %s", (email, address_id))
+        cur.execute("""
+            DELETE FROM address
+            WHERE email = %s AND house_number = %s AND street = %s AND city = %s
+            AND addr_state = %s AND zip_code = %s
+        """, (
+            email,
+            addr['house_number'],
+            addr['street'],
+            addr['city'],
+            addr['addr_state'],
+            addr['zip_code']
+        ))
         conn.commit()
         cur.close()
         conn.close()
         return jsonify({"message": "Address deleted."})
     except Exception as e:
         return jsonify({"message": f"Error: {str(e)}"}), 500
+
 
 #login -------------------------------------------------------------------------------------
 @auth.route('/api/login', methods=['POST'])
@@ -440,7 +466,7 @@ def login():
         cur.execute("SELECT password, role FROM user_auth WHERE email = %s", (email,))
         result = cur.fetchone()
 
-        if result and result[0] == password: # Compare plain text passwords (INSECURE!)
+        if result and result[0] == password: 
             session['user_email'] = email
             
             if result[1] == 'renter':

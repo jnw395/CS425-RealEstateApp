@@ -1,63 +1,79 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>View Profile</title>
-  <style>
-    body { font-family: Arial; padding: 20px; }
-    h2 { margin-bottom: 10px; }
-    .section { margin-top: 20px; }
-    ul { list-style-type: none; padding: 0; }
-    li { margin-bottom: 10px; }
-  </style>
+    <title>Profile</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        div { margin-bottom: 15px; }
+        h2 { color: #333; }
+        p { margin: 5px 0; }
+        a { color: #007BFF; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        button { padding: 10px; margin-top: 10px; cursor: pointer; }
+    </style>
 </head>
 <body>
-  <h2>Your Profile</h2>
+    <h2>Profile</h2>
+    <div id="profile-info">
+        <p><strong>First Name:</strong> <span id="first_name"></span></p>
+        <p><strong>Last Name:</strong> <span id="last_name"></span></p>
+        <p><strong>Email:</strong> <span id="email"></span></p>
+    </div>
 
-  <div class="section">
-    <strong>Name:</strong> <span id="name"></span><br>
-    <strong>Email:</strong> <span id="email"></span>
-  </div>
-
-  <div class="section">
     <h3>Credit Cards</h3>
-    <ul id="cards"></ul>
-  </div>
+    <div id="credit-cards">
+        </div>
 
-  <div class="section">
     <h3>Addresses</h3>
-    <ul id="addresses"></ul>
-  </div>
+    <div id="addresses">
+        </div>
+    <button id="editProfileButton">Edit Profile</button>
+    <button id="backToDashboard">Back to Dashboard</button>
 
-  <p><a href="/edit-profile">Edit Profile</a></p>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchProfile();
 
-  <script>
-    async function loadProfile() {
-      const res = await fetch('/api/view-profile', { credentials: 'include' });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.message);
-        return;
-      }
+            document.getElementById('editProfileButton').addEventListener('click', () => {
+                window.location.href = '/edit-profile';
+            });
+            document.getElementById('backToDashboard').addEventListener('click', () => {
+                window.location.href = 'renter_dash';
+            });
+        });
 
-      document.getElementById('name').textContent = `${data.first_name} ${data.last_name}`;
-      document.getElementById('email').textContent = data.email;
+        async function fetchProfile() {
+            const res = await fetch('/api/profile/details');
+            const data = await res.json();
 
-      const cardsList = document.getElementById('cards');
-      data.cards.forEach(card => {
-        const item = document.createElement('li');
-        item.textContent = `Card ending in ${card.last_four}, Expires ${card.exp_month}/${card.exp_year}`;
-        cardsList.appendChild(item);
-      });
+            document.getElementById('first_name').textContent = data.first_name;
+            document.getElementById('last_name').textContent = data.last_name;
+            document.getElementById('email').textContent = data.email;
 
-      const addressList = document.getElementById('addresses');
-      data.addresses.forEach(addr => {
-        const item = document.createElement('li');
-        item.textContent = `${addr.street}, ${addr.city}, ${addr.state}, ${addr.zip}`;
-        addressList.appendChild(item);
-      });
-    }
+            const creditCardsDiv = document.getElementById('credit-cards');
+            creditCardsDiv.innerHTML = ''; // Clear previous content
+            if (data.cards && data.cards.length > 0) {
+                data.cards.forEach(card => {
+                    const cardDiv = document.createElement('div');
+                    cardDiv.innerHTML = `<p>Card Number: ${card.card_number}, Expiration: ${card.expiration_date}</p>`;
+                    creditCardsDiv.appendChild(cardDiv);
+                });
+            } else {
+                creditCardsDiv.innerHTML = '<p>No credit cards on file.</p>';
+            }
 
-    loadProfile();
-  </script>
+            const addressesDiv = document.getElementById('addresses');
+            addressesDiv.innerHTML = ''; 
+            if (data.addresses && data.addresses.length > 0) {
+                data.addresses.forEach(address => {
+                    const addressDiv = document.createElement('div');
+                    addressDiv.innerHTML = `<p> ${address.house_number} ${address.street}, ${address.city}, ${address.addr_state} ${address.zip_code}</p>`;
+                    addressesDiv.appendChild(addressDiv);
+                });
+            } else {
+                addressesDiv.innerHTML = '<p>No addresses on file.</p>';
+            }
+        }
+    </script>
 </body>
 </html>
