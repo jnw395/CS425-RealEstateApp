@@ -342,57 +342,6 @@ def get_cards_and_addresses():
             conn.close()
         return jsonify({'error': f'Internal server error: {e}'}), 500
 
-#profile (agent)------------------------------------------------------------------------------------
-# @auth.route('/api/agent/edit-profile', methods=['POST'])  
-# def agent_edit_profile():
-#     data = request.get_json()
-#     current_email = data.get('current_email')
-#     current_password = data.get('current_password')
-#     first_name = data.get('first_name')
-#     last_name = data.get('last_name')
-#     new_email = data.get('new_email')
-#     new_password = data.get('new_password')
-#     job_title = data.get('job_title')        
-#     real_estate_agency = data.get('real_estate_agency')  
-
-#     if not current_email or not current_password:
-#         return jsonify({"message": "Email and password are required."}), 400
-
-#     try:
-#         conn = psycopg2.connect(**DB_PARAMS)
-#         cur = conn.cursor()
-
-#         cur.execute("SELECT password FROM user_auth WHERE email = %s", (current_email,))
-#         result = cur.fetchone()
-        
-#         if not result or result[0] != current_password:
-#             return jsonify({"message": "Incorrect email or password."}), 401
-
-#         # Update common fields in "user" table
-#         if first_name or last_name:
-#             cur.execute("UPDATE \"user\" SET first_name = %s, last_name = %s WHERE email = %s",
-#                         (first_name, last_name, current_email))
-
-#         if new_email:
-#             cur.execute("UPDATE \"user\" SET email = %s WHERE email = %s", (new_email, current_email))
-#             cur.execute("UPDATE user_auth SET email = %s WHERE email = %s", (new_email, current_email))
-#             cur.execute("UPDATE agent SET email = %s WHERE email = %s",(new_email, current_email)) #update agent table
-#             current_email = new_email
-
-#         if new_password:
-#             cur.execute("UPDATE user_auth SET password = %s WHERE email = %s", 
-#                         (new_password, current_email))
-#         if job_title or real_estate_agency:
-#             cur.execute("UPDATE agent SET job_title = %s, real_estate_agency = %s WHERE email = %s",
-#                         (job_title, real_estate_agency, current_email))
-
-#         conn.commit()
-#         cur.close()
-#         conn.close()
-
-#         return jsonify({"message": "Agent profile updated successfully."})
-#     except Exception as e:
-#         return jsonify({"message": f"Server error: {str(e)}"}), 500
 
 @auth.route('/agent/edit-profile')
 def agent_edit_profile_page():
