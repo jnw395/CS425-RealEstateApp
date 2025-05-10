@@ -15,7 +15,7 @@ DB_PARAMS = { #all info should be in a .env file on your local machine
 }
 
 #register-------------------------------------------------------------------------
-@auth.route('/register.html')
+@auth.route('/register')
 def register_page():
     return send_from_directory('static', 'register.html')
 
@@ -112,13 +112,13 @@ def view_profile():
     except Exception as e:
         return jsonify({'message': f'Server error: {str(e)}'}), 500
 
-@auth.route('/view-profile.html')
+@auth.route('/view-profile')
 def view_profile_page():
     return send_from_directory('static', 'view-profile.html')
 
 
 #profile (edit)-------------------------------------------------------------------------------------
-@auth.route('/edit-profile.html')
+@auth.route('/edit-profile')
 def profile_page():
     return send_from_directory('static', 'edit-profile.html')
 
@@ -220,7 +220,7 @@ def logout():
     return jsonify({"message": "Logged out"}), 200
 
 #added for now just to give register the option to go to page (still needs to be implemented)
-@auth.route('/login.html')
+@auth.route('/login')
 def login_page():
     return send_from_directory('static', 'login.html')
 
@@ -415,7 +415,7 @@ def enroll_reward():
         if cur.fetchone():
             cur.close()
             conn.close()
-            return redirect('/reward-status.html') 
+            return redirect('/reward-status') 
 
         #enrolled with 0 pts
         cur.execute("INSERT INTO reward_program (reward_pts, email) VALUES (%s, %s)", (0, email))
@@ -423,6 +423,6 @@ def enroll_reward():
         cur.close()
         conn.close()
 
-        return redirect('/reward-status.html')
+        return redirect('/reward-status')
     except Exception as e:
         return jsonify({'message': f'Server error: {str(e)}'}), 500
