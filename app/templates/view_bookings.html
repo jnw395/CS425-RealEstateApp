@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Your Bookings</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f9f9f9; }
+        h2 { margin-bottom: 20px; }
+        .booking-card {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .booking-card h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .booking-info p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Your Bookings</h2>
+
+    {% if bookings %}
+        {% for booking in bookings %}
+            <div class="booking-card">
+                <h3>Booking ID: {{ booking[4] }}</h3>
+                <div class="booking-info">
+                    <p><strong>City:</strong> {{ booking[0] }}</p>
+                    <p><strong>State:</strong> {{ booking[1] }}</p>
+                    <p><strong>Price:</strong> ${{ booking[2] }}</p>
+                    <p><strong>Description:</strong> {{ booking[3] }}</p>
+                    <p><strong>Card Used:</strong> {{ booking[5] }}</p>
+                    <p><strong>Booking Date:</strong> {{ booking[6] }}</p>
+                    <p><strong>Start Date:</strong> {{ booking[7] }}</p>
+                    <p><strong>End Date:</strong> {{ booking[8] }}</p>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>You have no bookings yet.</p>
+    {% endif %}
+
+    <br>
+    <a href="/renter_dash">Back to Dashboard</a>
+
+</body>
+</html>

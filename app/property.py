@@ -27,6 +27,11 @@ def renter_dash_page():
 def agent_dash_page():
     return render_template('agent_dash.html')
 
+# View bookings connection
+@property_bp.route('/view_bookings')
+def view_bookings_page():
+    return render_template('view_bookings.html')
+
 # Route for searching
 @property_bp.route('/api/search', methods=['POST'])
 def search_properties():
@@ -95,11 +100,55 @@ def search_properties():
     except Exception as e:
         return jsonify({"message": f"Error: {str(e)}"}), 500
 
+# Property details 
+@property_bp.route('/property-details/<property_id>', methods=['GET'])
+def property_details(property_id):
+    
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+
+        # Query to get details for a certain property
+        query = """
+            SELECT 
+                p.property_id,
+                p.city,
+                p.p_state,
+                p.price,
+                p.description,
+                p.property_type,
+                COALESCE(h.num_bedrooms, a.num_bedrooms, v.num_bedrooms) AS num_bedrooms
+            FROM property p
+            LEFT JOIN house h ON p.property_id = h.property_id
+            LEFT JOIN apartments a ON p.property_id = a.property_id
+            LEFT JOIN vacation_home v ON p.property_id = v.property_id
+            WHERE p.property_id = %s
+        """
+        cur.execute(query, (property_id,))
+        row = cur.fetchone()
+
+        if row:
+            property_details = {
+                "property_id": row[0],
+                "city": row[1],
+                "state": row[2],
+                "price": float(row[3]),
+                "description": row[4],
+                "property_type": row[5],
+                "num_bedrooms": row[6]
+            }
+            cur.close()
+            conn.close()
+            return render_template('property_details.html', property=property_details)
+        else:
+            cur.close()
+            conn.close()
+            return "Property not found", 404
+    
+    except Exception as e:
+        return jsonify({"message": f"Error: {str(e)}"}), 500
+
 # Booking--------------------------------------------------
-# View booking page
-@property_bp.route('/view_booking')
-def view_booking_page():
-    return render_template('view_booking.html')
 
 # Make booking w/payment
 @property_bp.route('/api/book', methods=['POST'])
@@ -178,8 +227,8 @@ def get_credit_cards():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
-# View booking
-@property_bp.route('/view_booking')
+# View booking for renters
+@property_bp.route('/view_bookings', methods=['GET'])
 def view_bookings():
     # Get the current user ID
     renter_id = session.get('email')
@@ -190,66 +239,95 @@ def view_bookings():
 
         # Fetch bookings for renter
         cur.execute("""
-            SELECT b.booking_id, p.city, p.p_state, p.price, b.start_date, b.end_date
+            SELECT p.city, p.p_state, p.price, p.description, 
+                    b.booking_id, b.card_number, b.booking_date, b.start_date, b.end_date
             FROM booking b
             JOIN property p ON b.property_id = p.property_id
-            WHERE b.renter_id = %s
-        """, (renter_id,))
+            WHERE b.email = %s
+        """, (renter_id))
         bookings = cur.fetchall()
 
         cur.close()
         conn.close()
 
+
         # Display bookings
-        return render_template('view_booking.html', bookings=bookings)
+        return render_template('view_bookings', bookings=bookings)
 
     except Exception as e:
         return jsonify({"error": f"Error: {str(e)}"}), 500
 
-# Property details 
-@property_bp.route('/property-details/<property_id>', methods=['GET'])
-def property_details(property_id):
+# Managing properties ----------------------------------------------------------
+
+# Adding property
+@property_bp.route('/api/add_property', methods=['POST'])
+def add_property():
+    data = request.get_json()
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
-
-        # Query to get details for a certain property
-        query = """
-            SELECT 
-                p.property_id,
-                p.city,
-                p.p_state,
-                p.price,
-                p.description,
-                p.property_type,
-                COALESCE(h.num_bedrooms, a.num_bedrooms, v.num_bedrooms) AS num_bedrooms
-            FROM property p
-            LEFT JOIN house h ON p.property_id = h.property_id
-            LEFT JOIN apartments a ON p.property_id = a.property_id
-            LEFT JOIN vacation_home v ON p.property_id = v.property_id
-            WHERE p.property_id = %s
-        """
-        cur.execute(query, (property_id,))
-        row = cur.fetchone()
-
-        if row:
-            property_details = {
-                "property_id": row[0],
-                "city": row[1],
-                "state": row[2],
-                "price": float(row[3]),
-                "description": row[4],
-                "property_type": row[5],
-                "num_bedrooms": row[6]
-            }
-            cur.close()
-            conn.close()
-            return render_template('property_details.html', property=property_details)
-        else:
-            cur.close()
-            conn.close()
-            return "Property not found", 404
-    
+        
+        cur.execute("""
+            INSERT INTO property (property_id, city, p_state, price, description, property_type)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (
+            data['property_id'],
+            data['city'],
+            data['p_state'],
+            data['price'],
+            data['description'],
+            data['property_type']
+        ))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"message": "Property added successfully."}), 200
     except Exception as e:
-        return jsonify({"message": f"Error: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
+    
+# Delete property
+@property_bp.route('/api/delete_property/<property_id>', methods=['DELETE'])
+def delete_property(property_id):
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+        
+        cur.execute("DELETE FROM property WHERE property_id = %s", (property_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"message": "Property deleted."}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Modify property
+@property_bp.route('/api/update_property/<property_id>', methods=['PUT'])
+def update_property(property_id):
+    data = request.get_json()
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+        
+        cur.execute("""
+            UPDATE property 
+            SET city = %s, p_state = %s, price = %s, description = %s, property_type = %s
+            WHERE property_id = %s
+        """, (
+            data['city'],
+            data['p_state'],
+            data['price'],
+            data['description'],
+            data['property_type'],
+            property_id
+        ))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"message": "Property updated."}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 
