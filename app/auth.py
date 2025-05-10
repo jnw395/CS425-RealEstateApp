@@ -1,5 +1,5 @@
 from flask import Blueprint, session, request, render_template, redirect, jsonify, send_from_directory
-import psycopg2, bcrypt, os
+import psycopg2, os
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,7 +23,7 @@ def register_page():
 def register():
     data = request.get_json()
     email = data.get('email')
-    password = data.get('password')
+    password = data.get('password')  
     first_name = data.get('first_name')
     last_name = data.get('last_name')
     role = data.get('role')
@@ -39,19 +39,17 @@ def register():
         if cur.fetchone():
             return jsonify({"message": "Email already registered."}), 409
 
-        password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-
         cur.execute("INSERT INTO \"user\" (email, first_name, last_name) VALUES (%s, %s, %s)",
                     (email, first_name, last_name))
-        cur.execute("INSERT INTO user_auth (email, password_hash, role) VALUES (%s, %s, %s)",
-                    (email, password_hash, role))
+        cur.execute("INSERT INTO user_auth (email, password, role) VALUES (%s, %s, %s)",
+                    (email, password, role)) 
         
         if role == "agent":
             cur.execute("INSERT INTO agent (email, job_title, real_estate_agency) VALUES (%s, %s, %s)",
-                        (email, '', '')) 
+                            (email, '', '')) 
         elif role == "renter":
             cur.execute("INSERT INTO prospective_renter (email, desired_move_in_date, budget) VALUES (%s, %s, %s)",
-                        (email, None, None)) 
+                            (email, None, None)) 
         conn.commit()
         cur.close()
         conn.close()
@@ -162,10 +160,10 @@ def edit_profile():
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
 
-        cur.execute("SELECT password_hash FROM user_auth WHERE email = %s", (current_email,))
+        cur.execute("SELECT password FROM user_auth WHERE email = %s", (current_email,))
         result = cur.fetchone()
         
-        if not result or not bcrypt.checkpw(current_password.encode(), result[0].encode()):
+        if not result or result[0] != current_password: # Compare plain text passwords
             return jsonify({"message": "Incorrect email or password."}), 401
 
         if first_name or last_name:
@@ -178,9 +176,9 @@ def edit_profile():
             current_email = new_email
 
         if new_password:
-            new_password_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
-            cur.execute("UPDATE user_auth SET password_hash = %s WHERE email = %s", 
-                        (new_password_hash, current_email))
+            # Store the plain text password (INSECURE!)
+            cur.execute("UPDATE user_auth SET password = %s WHERE email = %s", 
+                        (new_password, current_email))
 
         if credit_cards_to_add:
             for card in credit_cards_to_add:
@@ -340,38 +338,33 @@ def delete_address():
 @auth.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
-    email = data.get('email') 
+    email = data.get('email')
     password = data.get('password')
 
-    if not email or not password:
-        return jsonify({"message": "Email and password required."}), 400
-    
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
 
-        cur.execute("SELECT password_hash, role FROM user_auth WHERE email = %s", (email,))
+        cur.execute("SELECT password, role FROM user_auth WHERE email = %s", (email,))
         result = cur.fetchone()
 
-        if not result:
-            return jsonify({"message": "Invalid credentials."}), 401
+        if result and result[0] == password: # Compare plain text passwords (INSECURE!)
+            session['user_email'] = email
+            
+            if result[1] == 'renter':
+                return jsonify({"message": "Login successful!", "redirect_url": "/renter_dash", "role": "renter"})
+            elif result[1] == 'agent':
+                return jsonify({"message": "Login successful!", "redirect_url": "/agent_dash", "role": "agent"})
+            else:
+                return jsonify({"message": "Unknown role"}), 400
+        else:
+            return jsonify({"message": "Invalid email or password"}), 401
 
-        stored_hash, role = result
-        if not bcrypt.checkpw(password.encode(), stored_hash.encode()):
-            return jsonify({"message": "Invalid credentials."}), 401
-        
-        session['user_email'] = email
-        session['user_role'] = role
-
-        return jsonify({"message": "Login successful.", "role": role})
-    
     except Exception as e:
-        return jsonify({"message": f"Server error: {str(e)}"}), 500
-    
+        return jsonify({"message": f"Error: {str(e)}"}), 500
     finally:
-        cur.close()
-        conn.close()
-
+        if conn:
+            conn.close()
 #reward program -------------------------------------------------------------------------
 
 @auth.route('/reward-program')

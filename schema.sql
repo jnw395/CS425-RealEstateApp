@@ -33,7 +33,7 @@ p_state varchar(20),
 description varchar(200),
 price numeric(15, 2),
 sq_footage int,
-email varchar(100) UNIQUE,
+email varchar(100),
 neighborhood_name varchar(30),
 PRIMARY KEY (property_id),
 FOREIGN KEY (email) REFERENCES agent (email) ON DELETE CASCADE ON UPDATE CASCADE,
@@ -143,7 +143,7 @@ email varchar(100) REFERENCES prospective_renter (email) ON DELETE CASCADE ON UP
 
 CREATE TABLE user_auth (
     email VARCHAR(100) PRIMARY KEY,
-    password_hash TEXT NOT NULL,
+    password TEXT NOT NULL,
     role VARCHAR(20) NOT NULL,
     FOREIGN KEY (email) REFERENCES "user"(email) ON DELETE CASCADE ON UPDATE CASCADE
 );

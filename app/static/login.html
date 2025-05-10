@@ -16,36 +16,43 @@
     <form id="loginForm">
         <input type="email" id="email" placeholder="Email" required><br>
         <input type="password" id="password" placeholder="Password" required><br>
-        <button type="submit">Login</button href="/renter_dash.html">
+        <button type="submit">Login</button>
     </form>
     <div class="msg" id="msg"></div>
     
-    <p>Don't have an account? <a href="/register.html">Sign up here</a></p>
+    <p>Don't have an account? <a href="/register">Sign up here</a></p>
     <script>
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-        const res = await fetch('/api/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                email: document.getElementByID('email').value,
-                password:document.getElementById('password').value
-            })
-        });
-    
-        const data = await res.json();
-        document.getElementById('msg').innerText = data.message;
-        document.getElementById('msg').style.color = res.ok ? 'green':'red';
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
 
-        if (res.ok) {
-        // Redirect based on role
-        if (data.role === 'renter') {
-          window.location.href = '/renter_dash';
-        } else if (data.role === 'agent') {
-          window.location.href = '/agent_dash';
-        }
-      }
-    });
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    email: email,
+                    password: password
+                })
+            });
+            const data = await res.json();
+            const msgElement = document.getElementById('msg');
+            msgElement.innerText = data.message;
+            msgElement.style.color = res.ok ? 'green' : 'red';
+
+            if (res.ok) {
+                //redirects to different dashboards
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    console.error("No redirect URL received from server.");
+                }
+            } else {
+              if (data.message === "Invalid email or password") {
+                msgElement.innerText = "Your email or password was incorrect. Please try again.";
+              }
+            }
+        });
     </script>
 </body>
 </html>
