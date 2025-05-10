@@ -33,9 +33,10 @@ p_state varchar(20),
 description varchar(200),
 price numeric(15, 2),
 sq_footage int,
+availability boolean,
 email varchar(100),
 neighborhood_name varchar(30),
-PRIMARY KEY (property_id),
+PRIMARY KEY (property_id) not null default TRUE,
 FOREIGN KEY (email) REFERENCES agent (email) ON DELETE CASCADE ON UPDATE CASCADE,
 FOREIGN KEY (neighborhood_name) REFERENCES neighborhood (neighborhood_name)
 );

@@ -77,22 +77,22 @@ def view_profile():
         first_name, last_name = user_row
 
         cur.execute("""
-            SELECT id, last_four, exp_month, exp_year
+            SELECT card_number, expiration_date
             FROM credit_card
             WHERE email = %s
         """, (email,))
         cards = [
-            {'id': row[0], 'last_four': row[1], 'exp_month': row[2], 'exp_year': row[3]}
+            {'card_number': row[0], 'expiration_date': row[1]}
             for row in cur.fetchall()
         ]
 
         cur.execute("""
-            SELECT id, street, city, state, zip
+            SELECT house_number, street, city, addr_state, zip_code
             FROM address
             WHERE email = %s
         """, (email,))
         addresses = [
-            {'id': row[0], 'street': row[1], 'city': row[2], 'state': row[3], 'zip': row[4]}
+            {'house_number': row[0], 'street': row[1], 'city': row[2], 'addr_state': row[3], 'zip_code': row[4]}
             for row in cur.fetchall()
         ]
 
@@ -109,7 +109,7 @@ def view_profile():
 
     except Exception as e:
         return jsonify({'message': f'Server error: {str(e)}'}), 500
-
+    
 @auth.route('/view-profile')
 def view_profile_page():
     return send_from_directory('static', 'view-profile.html')
@@ -191,7 +191,7 @@ def edit_profile():
 
         if addresses_to_add:
             for address in addresses_to_add:
-                cur.execute("INSERT INTO addresses (email, address_line, city, state, postal_code, is_billing) VALUES (%s, %s, %s, %s, %s, %s)",
+                cur.execute("INSERT INTO address (email, address_line, city, state, postal_code, is_billing) VALUES (%s, %s, %s, %s, %s, %s)",
                             (current_email, address['address_line'], address['city'], address['state'], address['postal_code'], address['is_billing']))
 
         if addresses_to_remove:
@@ -252,6 +252,98 @@ def profile_details():
         })
     except Exception as e:
         return jsonify({'message': f'Server error: {str(e)}'}), 500
+    
+#profile (agent)------------------------------------------------------------------------------------
+@auth.route('/api/agent/edit-profile', methods=['POST'])  # Agent-specific edit profile
+def agent_edit_profile():
+    data = request.get_json()
+    current_email = data.get('current_email')
+    current_password = data.get('current_password')
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    new_email = data.get('new_email')
+    new_password = data.get('new_password')
+    job_title = data.get('job_title')        # Agent-specific field
+    real_estate_agency = data.get('real_estate_agency')  # Agent-specific field
+
+    if not current_email or not current_password:
+        return jsonify({"message": "Email and password are required."}), 400
+
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+
+        cur.execute("SELECT password FROM user_auth WHERE email = %s", (current_email,))
+        result = cur.fetchone()
+        
+        if not result or result[0] != current_password:
+            return jsonify({"message": "Incorrect email or password."}), 401
+
+        # Update common fields in "user" table
+        if first_name or last_name:
+            cur.execute("UPDATE \"user\" SET first_name = %s, last_name = %s WHERE email = %s",
+                        (first_name, last_name, current_email))
+
+        if new_email:
+            cur.execute("UPDATE \"user\" SET email = %s WHERE email = %s", (new_email, current_email))
+            cur.execute("UPDATE user_auth SET email = %s WHERE email = %s", (new_email, current_email))
+            cur.execute("UPDATE agent SET email = %s WHERE email = %s",(new_email, current_email)) #update agent table
+            current_email = new_email
+
+        if new_password:
+            cur.execute("UPDATE user_auth SET password = %s WHERE email = %s", 
+                        (new_password, current_email))
+
+        # Update agent-specific fields in "agent" table
+        if job_title or real_estate_agency:
+            cur.execute("UPDATE agent SET job_title = %s, real_estate_agency = %s WHERE email = %s",
+                        (job_title, real_estate_agency, current_email))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({"message": "Agent profile updated successfully."})
+    except Exception as e:
+        return jsonify({"message": f"Server error: {str(e)}"}), 500
+    
+@auth.route('/api/agent/view-profile', methods=['GET'])  # Agent-specific view profile
+def agent_view_profile():
+    email = request.args.get('email')  # Get email from query parameters
+
+    if not email:
+        return jsonify({"message": "Email is required."}), 400
+
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+
+        # Fetch data from "user" and "agent" tables
+        cur.execute("SELECT u.email, u.first_name, u.last_name, a.job_title, a.real_estate_agency "
+                    "FROM \"user\" u "
+                    "JOIN agent a ON u.email = a.email "
+                    "WHERE u.email = %s", (email,))
+        agent_data = cur.fetchone()
+
+        if not agent_data:
+            return jsonify({"message": "Agent not found."}), 404
+
+        # Convert the tuple to a dictionary
+        agent_dict = {
+            'email': agent_data[0],
+            'first_name': agent_data[1],
+            'last_name': agent_data[2],
+            'job_title': agent_data[3],
+            'real_estate_agency': agent_data[4]
+        }
+        
+        cur.close()
+        conn.close()
+
+        return jsonify(agent_dict), 200
+    except Exception as e:
+        return jsonify({"message": f"Server error: {str(e)}"}), 500
+    
 #profile (card)------------------------------------------------------------------------
 @auth.route('/api/add-card', methods=['POST'])
 def add_card():

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Agent Profile</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        div { margin-bottom: 10px; }
+        button { padding: 8px 16px; }
+    </style>
+</head>
+<body>
+    <h2>Agent Profile</h2>
+    <div id="profileData">
+        <div><strong>Email:</strong> <span id="email"></span></div>
+        <div><strong>First Name:</strong> <span id="first_name"></span></div>
+        <div><strong>Last Name:</strong> <span id="last_name"></span></div>
+        <div><strong>Job Title:</strong> <span id="job_title"></span></div>
+        <div><strong>Real Estate Agency:</strong> <span id="real_estate_agency"></span></div>
+    </div>
+    <button id="editProfileButton">Edit Profile</button>
+
+    <script>
+        const profileData = document.getElementById('profileData');
+        const editProfileButton = document.getElementById('editProfileButton');
+
+
+        async function fetchAgentProfile() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const email = urlParams.get('email'); 
+            if (!email) {
+                alert("Email is required to view profile.");
+                window.location.href = '/login'; 
+                return;
+            }
+
+            const res = await fetch(`/api/agent/view-profile?email=${email}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                document.getElementById('email').textContent = data.email;
+                document.getElementById('first_name').textContent = data.first_name;
+                document.getElementById('last_name').textContent = data.last_name;
+                document.getElementById('job_title').textContent = data.job_title;
+                document.getElementById('real_estate_agency').textContent = data.real_estate_agency;
+            } else {
+                profileData.innerHTML = `<div>Error: ${data.message}</div>`;
+            }
+        }
+        fetchAgentProfile();
+
+        editProfileButton.addEventListener('click', () => {
+             const urlParams = new URLSearchParams(window.location.search);
+             const email = urlParams.get('email');
+            window.location.href = `/agent_edit_profile.html?email=${email}`; // Pass email
+        });
+    </script>
+</body>
+</html>
