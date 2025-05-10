@@ -1,96 +1,107 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Renter Dashboard</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    input, select, button { margin: 5px; padding: 8px; }
-    .results { margin-top: 20px; }
-    .property { border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
-  </style>
+    <title>Renter Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        input, select, button { margin: 5px; padding: 8px; }
+        .results { margin-top: 20px; }
+        .property { border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
+    </style>
 </head>
 <body>
-  <h2>Welcome to Your Dashboard</h2>
+    <h2>Welcome to Your Dashboard</h2>
 
-  <h3>Search Properties</h3>
-  <form id="searchForm">
-    <input type="text" id="city" placeholder="City">
-    <input type="text" id="state" placeholder="State">
-    <input type="number" id="price_min" placeholder="Min Price">
-    <input type="number" id="price_max" placeholder="Max Price">
-    <button type="submit">Search</button>
-  </form>
+    <h3>Search Properties</h3>
+    <form id="searchForm">
+        <input type="text" id="city" placeholder="City">
+        <input type="text" id="state" placeholder="State">
+        <input type="number" id="price_min" placeholder="Min Price">
+        <input type="number" id="price_max" placeholder="Max Price">
+        <button type="submit">Search</button>
+    </form>
 
-  <div class="results" id="results"></div>
+    <div class="results" id="results"></div>
 
-  <a href="/view-profile"> <button class="view-profile-btn">View Profile</button></a>
+    <a href="/view-profile"> <button class="view-profile-btn">View Profile</button></a>
 
-  <a href="/view-profile"> <button type="button">Rewards</button></a>
+    <button id="rewardsButton">Rewards</button>
 
-  <script>
-    document.getElementById('searchForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
+    <script>
+        document.getElementById('searchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
 
-      const res = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          city: document.getElementById('city').value || null,
-          state: document.getElementById('state').value || null,
-          price_min: document.getElementById('price_min').value || null,
-          price_max: document.getElementById('price_max').value || null,
-        })
-      });
+            const res = await fetch('/api/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    city: document.getElementById('city').value || null,
+                    state: document.getElementById('state').value || null,
+                    price_min: document.getElementById('price_min').value || null,
+                    price_max: document.getElementById('price_max').value || null,
+                })
+            });
 
-      const data = await res.json();
-      const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = '';
+            const data = await res.json();
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
 
-      if (data.results && data.results.length > 0) {
-        data.results.forEach(p => {
-          const div = document.createElement('div');
-          div.className = 'property';
-          div.innerHTML = `
-            <strong>${p.city}, ${p.state}</strong><br>
-            Price: $${Number(p.price).toLocaleString()}<br>
-            ${p.description}<br><br>
+            if (data.results && data.results.length > 0) {
+                data.results.forEach(p => {
+                    const div = document.createElement('div');
+                    div.className = 'property';
+                    div.innerHTML = `
+                        <strong>${p.city}, ${p.state}</strong><br>
+                        Price: $${Number(p.price).toLocaleString()}<br>
+                        ${p.description}<br><br>
 
-            <label for="start_date_${p.property_id}">Start Date:</label>
-            <input type="date" id="start_date_${p.property_id}" required><br>
-            <label for="end_date_${p.property_id}">End Date:</label>
-            <input type="date" id="end_date_${p.property_id}" required><br>
-            <button onclick="bookProperty(${p.property_id})">Book Now</button>
-            `;
-        resultsDiv.appendChild(div)
+                        <label for="start_date_${p.property_id}">Start Date:</label>
+                        <input type="date" id="start_date_${p.property_id}" required><br>
+                        <label for="end_date_${p.property_id}">End Date:</label>
+                        <input type="date" id="end_date_${p.property_id}" required><br>
+                        <button onclick="bookProperty(${p.property_id})">Book Now</button>
+                    `;
+                    resultsDiv.appendChild(div)
+                });
+            } else {
+                resultsDiv.innerText = 'No results found.';
+            }
         });
-      } else {
-        resultsDiv.innerText = 'No results found.';
-      }
-    });
 
-    //book button under every property
-    async function bookProperty(propertyId) {
-    const startDate = document.getElementById(`start_date_${propertyId}`).value;
-    const endDate = document.getElementById(`end_date_${propertyId}`).value;
+        //book button under every property
+        async function bookProperty(propertyId) {
+            const startDate = document.getElementById(`start_date_${propertyId}`).value;
+            const endDate = document.getElementById(`end_date_${propertyId}`).value;
 
-    if (!startDate || !endDate) {
-      return alert("Please enter both start and end dates.");
-    }
+            if (!startDate || !endDate) {
+                return alert("Please enter both start and end dates.");
+            }
 
-    const res = await fetch('/api/book', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        property_id: propertyId,
-        start_date: startDate,
-        end_date: endDate
-      })
-    });
+            const res = await fetch('/api/book', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    property_id: propertyId,
+                    start_date: startDate,
+                    end_date: endDate
+                })
+            });
 
-    const data = await res.json();
-    alert(data.message || data.error);
-  }
+            const data = await res.json();
+            alert(data.message || data.error);
+        }
 
-  </script>
+        document.getElementById('rewardsButton').addEventListener('click', async () => {
+            const res = await fetch('/api/check-rewards-enrollment');
+            const data = await res.json();
+
+            if (data.enrolled) {
+                window.location.href = '/reward_status'; 
+            } else {
+                window.location.href = '/rewards_enroll';
+            }
+        });
+
+    </script>
 </body>
 </html>

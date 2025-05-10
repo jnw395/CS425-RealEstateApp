@@ -29,16 +29,21 @@
         </div>
     <button id="editProfileButton">Edit Profile</button>
     <button id="backToDashboard">Back to Dashboard</button>
+    <button id="logoutButton">Logout</button>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             fetchProfile();
 
             document.getElementById('editProfileButton').addEventListener('click', () => {
-                window.location.href = '/edit-profile';
+                window.location.href = '/edit-profile.html';
             });
             document.getElementById('backToDashboard').addEventListener('click', () => {
-                window.location.href = 'renter_dash';
+                window.location.href = '/dashboard.html';
+            });
+            document.getElementById('logoutButton').addEventListener('click', () => {
+                
+                window.location.href = '/login'; 
             });
         });
 
@@ -51,7 +56,7 @@
             document.getElementById('email').textContent = data.email;
 
             const creditCardsDiv = document.getElementById('credit-cards');
-            creditCardsDiv.innerHTML = ''; // Clear previous content
+            creditCardsDiv.innerHTML = ''; 
             if (data.cards && data.cards.length > 0) {
                 data.cards.forEach(card => {
                     const cardDiv = document.createElement('div');
