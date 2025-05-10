@@ -1,22 +1,86 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agent Profile</title>
     <style>
-        body { font-family: Arial; padding: 20px; }
-        div { margin-bottom: 10px; }
-        button { padding: 8px 16px; }
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        div {
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
     </style>
 </head>
 <body>
+
     <h2>Agent Profile</h2>
-    <div>
-        <div><strong>Email:</strong> {{ agent_data[0] }}</div>
-        <div><strong>First Name:</strong> {{ agent_data[1] }}</div>
-        <div><strong>Last Name:</strong> {{ agent_data[2] }}</div>
-        <div><strong>Job Title:</strong> {{ agent_data[3] }}</div>
-        <div><strong>Real Estate Agency:</strong> {{ agent_data[4] }}</div>
+    
+    <div id="profileData">
+        <div><strong>Email:</strong> <span id="email"></span></div>
+        <div><strong>First Name:</strong> <span id="first_name"></span></div>
+        <div><strong>Last Name:</strong> <span id="last_name"></span></div>
+        <div><strong>Job Title:</strong> <span id="job_title"></span></div>
+        <div><strong>Real Estate Agency:</strong> <span id="real_estate_agency"></span></div>
     </div>
-    <button onclick="window.location.href='/agent/edit-profile'">Edit Profile</button>
+
+    <button id="editProfileButton">Edit Profile</button>
+
+    <script>
+        // Get the current email from the query string of the URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const email = urlParams.get('email');
+        
+        if (!email) {
+            alert("Email is required to view profile.");
+            window.location.href = '/login';  // Redirect to login if no email is found
+        }
+
+        // Function to fetch agent data from the backend
+        async function fetchAgentProfile() {
+            try {
+                const res = await fetch(`/api/agent/view-profile?email=${email}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('email').textContent = data.email;
+                    document.getElementById('first_name').textContent = data.first_name;
+                    document.getElementById('last_name').textContent = data.last_name;
+                    document.getElementById('job_title').textContent = data.job_title;
+                    document.getElementById('real_estate_agency').textContent = data.real_estate_agency;
+                } else {
+                    document.getElementById('profileData').innerHTML = `<div>Error: ${data.message}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('profileData').innerHTML = `<div>Error: Unable to fetch profile data.</div>`;
+            }
+        }
+
+        // Fetch the agent profile when the page loads
+        fetchAgentProfile();
+
+        // Set up the "Edit Profile" button click event
+        const editProfileButton = document.getElementById('editProfileButton');
+        editProfileButton.addEventListener('click', () => {
+            window.location.href = `/agent/edit-profile?email=${email}`;  // Redirect to edit profile page with email
+        });
+    </script>
+
 </body>
 </html>
