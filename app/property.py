@@ -15,7 +15,7 @@ DB_PARAMS = { #all info should be in a .env file on your local machine
     'port': os.getenv('DB_PORT')
 }
 # Renter dashboard connection
-@property_bp.route('/renter_dash')
+@property_bp.route('/renter_dash.html')
 def renter_dash_page():
     return render_template('renter_dash.html')
 

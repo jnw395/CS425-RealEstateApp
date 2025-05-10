@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Renter Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    input, select, button { margin: 5px; padding: 8px; }
+    .results { margin-top: 20px; }
+    .property { border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h2>Welcome to Your Dashboard</h2>
+
+  <h3>Search Properties</h3>
+  <form id="searchForm">
+    <input type="text" id="city" placeholder="City">
+    <input type="text" id="state" placeholder="State">
+    <input type="number" id="price_min" placeholder="Min Price">
+    <input type="number" id="price_max" placeholder="Max Price">
+    <button type="submit">Search</button>
+  </form>
+
+  <div class="results" id="results"></div>
+
+  <script>
+    document.getElementById('searchForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const res = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          city: document.getElementById('city').value || null,
+          state: document.getElementById('state').value || null,
+          price_min: document.getElementById('price_min').value || null,
+          price_max: document.getElementById('price_max').value || null,
+        })
+      });
+
+      const data = await res.json();
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '';
+
+      if (data.results && data.results.length > 0) {
+        data.results.forEach(p => {
+          const div = document.createElement('div');
+          div.className = 'property';
+          div.innerHTML = `
+            <strong>${p.city}, ${p.state}</strong><br>
+            Price: $${p.price}<br>
+            ${p.description}
+          `;
+          resultsDiv.appendChild(div);
+        });
+      } else {
+        resultsDiv.innerText = 'No results found.';
+      }
+    });
+  </script>
+</body>
+</html>
