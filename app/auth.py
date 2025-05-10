@@ -394,30 +394,25 @@ def get_cards_and_addresses():
 #     except Exception as e:
 #         return jsonify({"message": f"Server error: {str(e)}"}), 500
 
-@auth.route('/agent/edit-profile', methods=['GET'])
+@auth.route('/agent/edit-profile')
 def agent_edit_profile_page():
-    email = request.args.get('email')
+    email = session.get('email')
     if not email:
-        return jsonify({"message": "Email is required."}), 400
+        return jsonify({'message': 'Not logged in'}), 401
 
-    # Fetch agent data to populate the edit form (example)
-    try:
-        conn = psycopg2.connect(**DB_PARAMS)
-        cur = conn.cursor()
-        cur.execute("SELECT first_name, last_name, job_title, real_estate_agency FROM agent WHERE email = %s", (email,))
-        agent_data = cur.fetchone()
-        cur.close()
-        conn.close()
+    agent_data = get_agent_profile_data(email)
+    if not agent_data:
+        return "Agent not found.", 404
 
-        if not agent_data:
-            return jsonify({"message": "Agent not found."}), 404
+    return render_template(
+        'agent_edit_profile.html',
+        agent_data=agent_data
+    )
 
-        return render_template('agent_edit_profile.html', agent_data=agent_data, email=email)
-    except Exception as e:
-        return jsonify({"message": f"Server error: {str(e)}"}), 500
+
 
     
-@auth.route('/agent/view-profile', methods=['GET'])
+@auth.route('/agent/view-profile')
 def agent_view_profile_page():
     email = session.get('email')
     if not email:
@@ -426,8 +421,14 @@ def agent_view_profile_page():
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
-        cur.execute("SELECT u.email, u.first_name, u.last_name, a.job_title, a.real_estate_agency "
-                    "FROM \"user\" u JOIN agent a ON u.email = a.email WHERE u.email = %s", (email,))
+        
+        # Updated query to join "user" and "agent" tables
+        cur.execute("""
+            SELECT u.first_name, u.last_name, a.job_title, a.real_estate_agency
+            FROM "user" u
+            JOIN agent a ON u.email = a.email
+            WHERE u.email = %s
+        """, (email,))
         agent_data = cur.fetchone()
         cur.close()
         conn.close()
@@ -435,11 +436,38 @@ def agent_view_profile_page():
         if not agent_data:
             return "Agent not found.", 404
 
+        # Pass agent data to the template
         return render_template('agent_profile.html', agent_data=agent_data)
 
     except Exception as e:
         return f"Server error: {str(e)}", 500
 
+def get_agent_profile_data(email):
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT u.email, u.first_name, u.last_name, a.job_title, a.real_estate_agency
+            FROM "user" u
+            JOIN agent a ON u.email = a.email
+            WHERE u.email = %s
+        """, (email,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if row:
+            return {
+                'email': row[0],
+                'first_name': row[1],
+                'last_name': row[2],
+                'job_title': row[3],
+                'real_estate_agency': row[4]
+            }
+        return None
+    except Exception as e:
+        print("Error fetching agent profile:", str(e))
+        return None
 
     
 #profile (card)------------------------------------------------------------------------
