@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>View Profile</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    h2 { margin-bottom: 10px; }
+    .section { margin-top: 20px; }
+    ul { list-style-type: none; padding: 0; }
+    li { margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Your Profile</h2>
+
+  <div class="section">
+    <strong>Name:</strong> <span id="name"></span><br>
+    <strong>Email:</strong> <span id="email"></span>
+  </div>
+
+  <div class="section">
+    <h3>Credit Cards</h3>
+    <ul id="cards"></ul>
+  </div>
+
+  <div class="section">
+    <h3>Addresses</h3>
+    <ul id="addresses"></ul>
+  </div>
+
+  <p><a href="/edit-profile.html">Edit Profile</a></p>
+
+  <script>
+    async function loadProfile() {
+      const res = await fetch('/api/view-profile', { credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message);
+        return;
+      }
+
+      document.getElementById('name').textContent = `${data.first_name} ${data.last_name}`;
+      document.getElementById('email').textContent = data.email;
+
+      const cardsList = document.getElementById('cards');
+      data.cards.forEach(card => {
+        const item = document.createElement('li');
+        item.textContent = `Card ending in ${card.last_four}, Expires ${card.exp_month}/${card.exp_year}`;
+        cardsList.appendChild(item);
+      });
+
+      const addressList = document.getElementById('addresses');
+      data.addresses.forEach(addr => {
+        const item = document.createElement('li');
+        item.textContent = `${addr.street}, ${addr.city}, ${addr.state}, ${addr.zip}`;
+        addressList.appendChild(item);
+      });
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>

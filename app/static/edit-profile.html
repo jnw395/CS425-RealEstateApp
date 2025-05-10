@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Profile</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    input, select, textarea { margin: 5px 0; padding: 8px; width: 250px; }
+    button { padding: 8px 16px; }
+    .msg { margin-top: 10px; color: red; }
+    .container { margin-bottom: 20px; }
+    .address-info { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Edit Profile</h2>
+
+  <div class="container">
+    <h3>Profile Information</h3>
+    <form id="profileForm">
+      <input type="text" id="first_name" placeholder="First Name (Optional)"><br>
+      <input type="text" id="last_name" placeholder="Last Name (Optional)"><br>
+      <input type="email" id="email" placeholder="Email" disabled><br>
+      <button type="submit">Save Changes</button>
+    </form>
+  </div>
+
+  <div class="container">
+    <h3>Credit Card Information</h3>
+    <form id="addCardForm">
+      <input type="text" id="card_number" placeholder="Card Number" maxlength="16" required><br>
+      <input type="text" id="expiration" placeholder="Expiration Date (MM/YY)" required><br>
+      <select id="billing_address" required>
+        <option value="">Select Billing Address</option>
+      </select><br>
+      <button type="submit">Add Credit Card</button>
+    </form>
+
+    <div id="creditCardList"></div>
+  </div>
+
+  <div class="container">
+    <h3>Addresses</h3>
+    <form id="addAddressForm">
+      <textarea id="address" placeholder="Enter full address" required></textarea><br>
+      <button type="submit">Add Address</button>
+    </form>
+
+    <div id="addressList"></div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      fetchProfile();
+      fetchCardsAndAddresses();
+    });
+
+    async function fetchProfile() {
+      const res = await fetch('/api/profile');
+      const data = await res.json();
+      if (data.first_name || data.last_name) {
+        document.getElementById('first_name').value = data.first_name || '';
+        document.getElementById('last_name').value = data.last_name || '';
+      }
+      document.getElementById('email').value = data.email;
+    }
+
+    async function fetchCardsAndAddresses() {
+      const res = await fetch('/api/get-cards-and-addresses');
+      const data = await res.json();
+
+      const creditCardList = document.getElementById('creditCardList');
+      creditCardList.innerHTML = '';
+      data.cards.forEach(card => {
+        const cardDiv = document.createElement('div');
+        cardDiv.innerHTML = `
+          <span>${card.card_number} - ${card.expiration}</span>
+          <button onclick="deleteCard('${card.id}')">Delete</button>
+          <button onclick="editCard('${card.id}')">Edit</button>
+        `;
+        creditCardList.appendChild(cardDiv);
+      });
+
+      const billingAddressSelect = document.getElementById('billing_address');
+      billingAddressSelect.innerHTML = '<option value="">Select Billing Address</option>';
+      data.addresses.forEach(address => {
+        const option = document.createElement('option');
+        option.value = address.id;
+        option.innerText = `${address.address}`;
+        billingAddressSelect.appendChild(option);
+      });
+
+      const addressList = document.getElementById('addressList');
+      addressList.innerHTML = '';
+      data.addresses.forEach(address => {
+        const addressDiv = document.createElement('div');
+        addressDiv.innerHTML = `
+          <span>${address.address}</span>
+          <button onclick="deleteAddress('${address.id}')">Delete</button>
+        `;
+        addressList.appendChild(addressDiv);
+      });
+    }
+
+    document.getElementById('profileForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const res = await fetch('/api/edit-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: document.getElementById('first_name').value,
+          last_name: document.getElementById('last_name').value
+        })
+      });
+      const data = await res.json();
+      alert(data.message);
+    });
+
+    document.getElementById('addCardForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const res = await fetch('/api/add-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          card_number: document.getElementById('card_number').value,
+          expiration: document.getElementById('expiration').value,
+          billing_address_id: document.getElementById('billing_address').value
+        })
+      });
+      const data = await res.json();
+      alert(data.message);
+      fetchCardsAndAddresses();
+    });
+
+    document.getElementById('addAddressForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const res = await fetch('/api/add-address', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: document.getElementById('address').value
+        })
+      });
+      const data = await res.json();
+      alert(data.message);
+      fetchCardsAndAddresses();
+    });
+
+    async function deleteCard(cardId) {
+      const res = await fetch(`/api/delete-card/${cardId}`, { method: 'DELETE' });
+      const data = await res.json();
+      alert(data.message);
+      fetchCardsAndAddresses();
+    }
+
+    async function deleteAddress(addressId) {
+      const res = await fetch(`/api/delete-address/${addressId}`, { method: 'DELETE' });
+      const data = await res.json();
+      alert(data.message);
+      fetchCardsAndAddresses();
+    }
+  </script>
+</body>
+</html>
