@@ -14,10 +14,16 @@ DB_PARAMS = { #all info should be in a .env file on your local machine
     'host': os.getenv('DB_HOST'),
     'port': os.getenv('DB_PORT')
 }
+
 # Renter dashboard connection
 @property_bp.route('/renter_dash')
 def renter_dash_page():
     return render_template('renter_dash.html')
+
+# Agent dashboard connection
+@property_bp.route('/agent_dash')
+def agent_dash_page():
+    return render_template('agent_dash.html')
 
 # Route for searching
 @property_bp.route('/api/search', methods=['POST'])
@@ -67,6 +73,12 @@ def search_properties():
         return jsonify({"message": f"Error: {str(e)}"}), 500
 
 # Booking--------------------------------------------------
+# View booking page
+@property_bp.route('/view_booking')
+def view_booking_page():
+    return render_template('view_booking.html')
+
+# Make booking
 @property_bp.route('/api/book', methods=['POST'])
 def book_property():
     data = request.get_json()
@@ -96,3 +108,32 @@ def book_property():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# View booking
+@property_bp.route('/view_booking')
+def view_bookings():
+    # Get the current user ID (assuming the user is logged in)
+    renter_id = session.get('renter_id')
+
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+
+        # Fetch bookings for the logged-in renter
+        cur.execute("""
+            SELECT b.booking_id, p.city, p.p_state, p.price, b.start_date, b.end_date
+            FROM booking b
+            JOIN property p ON b.property_id = p.property_id
+            WHERE b.renter_id = %s
+        """, (renter_id,))
+        bookings = cur.fetchall()
+
+        cur.close()
+        conn.close()
+
+        # Display bookings
+        return render_template('view_booking.html', bookings=bookings)
+
+    except Exception as e:
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+    
