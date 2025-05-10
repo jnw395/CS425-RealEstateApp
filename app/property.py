@@ -33,7 +33,7 @@ def search_properties():
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
 
-        # Search for properties( filter by city and price)
+        # Search for properties(filter by location and price)
         query = """
             SELECT property_id, city, p_state, price, description
             FROM property
@@ -67,5 +67,32 @@ def search_properties():
         return jsonify({"message": f"Error: {str(e)}"}), 500
 
 # Booking--------------------------------------------------
+@property_bp.route('/api/book', methods=['POST'])
+def book_property():
+    data = request.get_json()
+    renter_id = session.get('renter_id')  
+    property_id = data.get('property_id')
+    start_date = data.get('start_date')
+    end_date = data.get('end_date')
 
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
 
+        if not (property_id and start_date and end_date):
+            return jsonify({"error": "Missing booking details."}), 400
+
+        # Insert into bookings table
+        cur.execute("""
+            INSERT INTO booking (renter_id, property_id, start_date, end_date)
+            VALUES (%s, %s, %s, %s)
+        """, (renter_id, property_id, start_date, end_date))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({"message": "Booking successful!"})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

@@ -48,15 +48,45 @@
           div.className = 'property';
           div.innerHTML = `
             <strong>${p.city}, ${p.state}</strong><br>
-            Price: $${p.price}<br>
-            ${p.description}
-          `;
-          resultsDiv.appendChild(div);
+            Price: $${Number(p.price).toLocaleString()}<br>
+            ${p.description}<br><br>
+
+            <label for="start_date_${p.property_id}">Start Date:</label>
+            <input type="date" id="start_date_${p.property_id}" required><br>
+            <label for="end_date_${p.property_id}">End Date:</label>
+            <input type="date" id="end_date_${p.property_id}" required><br>
+            <button onclick="bookProperty(${p.property_id})">Book Now</button>
+            `;
+        resultsDiv.appendChild(div)
         });
       } else {
         resultsDiv.innerText = 'No results found.';
       }
     });
+
+    //book button under every property
+    async function bookProperty(propertyId) {
+    const startDate = document.getElementById(`start_date_${propertyId}`).value;
+    const endDate = document.getElementById(`end_date_${propertyId}`).value;
+
+    if (!startDate || !endDate) {
+      return alert("Please enter both start and end dates.");
+    }
+
+    const res = await fetch('/api/book', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        property_id: propertyId,
+        start_date: startDate,
+        end_date: endDate
+      })
+    });
+
+    const data = await res.json();
+    alert(data.message || data.error);
+  }
+
   </script>
 </body>
 </html>
