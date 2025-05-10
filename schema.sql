@@ -17,14 +17,14 @@ email varchar(100) UNIQUE,
 desired_move_in_date date,
 budget numeric(15,2),
 PRIMARY KEY (email),
-FOREIGN KEY (email) REFERENCES "user"(email)
+FOREIGN KEY (email) REFERENCES "user"(email) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE agent(
 email varchar(100) UNIQUE,
 job_title varchar(30),
 real_estate_agency varchar(50),
 PRIMARY KEY (email),
-FOREIGN KEY (email) REFERENCES "user"(email)
+FOREIGN KEY (email) REFERENCES "user"(email) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE property(
 property_id varchar(8),
@@ -36,7 +36,7 @@ sq_footage int,
 email varchar(100) UNIQUE,
 neighborhood_name varchar(30),
 PRIMARY KEY (property_id),
-FOREIGN KEY (email) REFERENCES agent (email),
+FOREIGN KEY (email) REFERENCES agent (email) ON DELETE CASCADE ON UPDATE CASCADE,
 FOREIGN KEY (neighborhood_name) REFERENCES neighborhood (neighborhood_name)
 );
 CREATE TABLE house(
@@ -80,12 +80,12 @@ end_date date,
 email varchar(100),
 property_id varchar(8),
 PRIMARY KEY(booking_id),
-FOREIGN KEY (email) REFERENCES "user"(email),
+FOREIGN KEY (email) REFERENCES "user"(email) ON DELETE CASCADE ON UPDATE CASCADE,
 FOREIGN KEY (property_id) REFERENCES property(property_id)
 );
 --Multi-valued
 CREATE TABLE address(
-email varchar(100) REFERENCES "user" (email),
+email varchar(100) REFERENCES "user" (email) ON DELETE CASCADE ON UPDATE CASCADE,
 house_number varchar(5),
 street varchar(20),
 city varchar(20),
@@ -94,14 +94,14 @@ zip_code varchar(10),
 PRIMARY KEY (email, house_number, street, city, addr_state, zip_code)
 );
 CREATE TABLE credit_card(
-email varchar (100) REFERENCES prospective_renter(email),
+email varchar (100) REFERENCES prospective_renter(email) ON DELETE CASCADE ON UPDATE CASCADE,
 card_number varchar(16),
 expiration_date date,
 CVV varchar(3),
 PRIMARY KEY (email, card_number)
 );
 CREATE TABLE preferred_loc(
-email varchar(100) REFERENCES prospective_renter(email),
+email varchar(100) REFERENCES prospective_renter(email) ON DELETE CASCADE ON UPDATE CASCADE,
 city varchar(20),
 pre_state varchar(20),
 priority int,
@@ -120,21 +120,21 @@ CREATE TABLE looks_at(
 email varchar(100),
 booking_id varchar(8),
 PRIMARY KEY(email, booking_id),
-FOREIGN KEY (email) REFERENCES agent(email),
+FOREIGN KEY (email) REFERENCES agent(email) ON DELETE CASCADE ON UPDATE CASCADE,
 FOREIGN KEY (booking_id) REFERENCES booking(booking_id)
 );
 CREATE TABLE makes(
 email varchar(100),
 booking_id varchar(8),
 PRIMARY KEY(email, booking_id),
-FOREIGN KEY (email) REFERENCES prospective_renter(email),
+FOREIGN KEY (email) REFERENCES prospective_renter(email) ON DELETE CASCADE ON UPDATE CASCADE,
 FOREIGN KEY (booking_id) REFERENCES booking(booking_id)
 );
 --Weak
 CREATE TABLE reward_program(
 reward_id varchar(8),
 reward_pts int,
-email varchar(100) REFERENCES prospective_renter (email)
+email varchar(100) REFERENCES prospective_renter (email) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 
@@ -144,5 +144,5 @@ CREATE TABLE user_auth (
     email VARCHAR(100) PRIMARY KEY,
     password_hash TEXT NOT NULL,
     role VARCHAR(20) NOT NULL,
-    FOREIGN KEY (email) REFERENCES "user"(email) ON DELETE CASCADE
+    FOREIGN KEY (email) REFERENCES "user"(email) ON DELETE CASCADE ON UPDATE CASCADE
 );
