@@ -1,7 +1,9 @@
-from flask import Blueprint, render_template, request, session, jsonify, send_from_directory
+from flask import Blueprint, render_template, url_for, redirect, request, session, jsonify, send_from_directory
 import psycopg2
 import os
 from dotenv import load_dotenv
+import uuid  # for generating booking ID
+from datetime import datetime
 
 load_dotenv()
 
@@ -103,9 +105,13 @@ def view_booking_page():
 @property_bp.route('/api/book', methods=['POST'])
 def book_property():
     data = request.form
+    renter_id = session.get('email')
+    if not renter_id:
+        return jsonify({"message": "User not logged in."}), 401
+    
     property_id = data['property_id']
-    start_date = data['start_date']
-    end_date = data['end_date']
+    start_date = datetime.strptime(data['start_date'], "%Y-%m-%d").date()
+    end_date = datetime.strptime(data['end_date'], "%Y-%m-%d").date()
     credit_card_number = data['credit_card']  # The selected credit card number
 
     try:
@@ -113,40 +119,76 @@ def book_property():
         cur = conn.cursor()
 
         # Check if the selected credit card exists
-        query = "SELECT * FROM credit_card WHERE card_number = %s"
-        cur.execute(query, (credit_card_number,))
+        query = "SELECT * FROM credit_card WHERE card_number = %s AND email = %s"
+        cur.execute(query, (credit_card_number, renter_id))
         card = cur.fetchone()
 
         if not card:
             return jsonify({"message": "Invalid credit card selected."}), 400
         
-        # Insert the booking into the bookings table
-        query = """
-            INSERT INTO bookings (property_id, start_date, end_date, credit_card_number)
-            VALUES (%s, %s, %s, %s)
-        """
-        cur.execute(query, (property_id, start_date, end_date, credit_card_number))
-        conn.commit()
+        # Generate booking ID and insert booking
+        booking_id = f"B{str(uuid.uuid4().int)[:7]}"
+        today = datetime.today().date()
+        reward_pts = 100  # or calculate based on amount/days/etc.
 
+        cur.execute("""
+            INSERT INTO booking (
+                booking_id, booking_date, reward_pts_earned,
+                card_number, start_date, end_date,
+                email, property_id
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            booking_id, today, reward_pts,
+            credit_card_number, start_date, end_date,
+            renter_id, property_id
+        ))
+        conn.commit()
         cur.close()
         conn.close()
 
-        return jsonify({"message": "Booking confirmed!"}), 200
+        return redirect(url_for('property.renter_dash_page'))
     
     except Exception as e:
         return jsonify({"message": f"Error: {str(e)}"}), 500
 
-# View booking
-@property_bp.route('/view_booking')
-def view_bookings():
-    # Get the current user ID (assuming the user is logged in)
-    renter_id = session.get('renter_id')
+# Get credit cards
+@property_bp.route('/api/credit-cards', methods=['GET'])
+def get_credit_cards():
+    renter_email = session.get('email')
+    if not renter_email:
+        return jsonify({'error': 'Not logged in'}), 401
 
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
 
-        # Fetch bookings for the logged-in renter
+        print("Session:", session)
+
+        query = "SELECT card_number FROM credit_card WHERE email = %s"
+        cur.execute(query, (renter_email,))
+        cards = cur.fetchall()
+
+        cur.close()
+        conn.close()
+
+        card_list = [card[0] for card in cards]
+        return jsonify({'cards': card_list}) # return list of cards
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+# View booking
+@property_bp.route('/view_booking')
+def view_bookings():
+    # Get the current user ID
+    renter_id = session.get('email')
+
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+
+        # Fetch bookings for renter
         cur.execute("""
             SELECT b.booking_id, p.city, p.p_state, p.price, b.start_date, b.end_date
             FROM booking b
@@ -164,6 +206,7 @@ def view_bookings():
     except Exception as e:
         return jsonify({"error": f"Error: {str(e)}"}), 500
 
+# Property details 
 @property_bp.route('/property-details/<property_id>', methods=['GET'])
 def property_details(property_id):
     try:
@@ -190,11 +233,6 @@ def property_details(property_id):
         row = cur.fetchone()
 
         if row:
-            # find credit card for the respective renter
-            email = session.get('user_email')  # Assuming user email is stored in session
-            cur.execute("SELECT card_number, expiration_date FROM credit_card WHERE email = %s", (email,))
-            credit_cards = cur.fetchall()
-
             property_details = {
                 "property_id": row[0],
                 "city": row[1],
@@ -206,7 +244,7 @@ def property_details(property_id):
             }
             cur.close()
             conn.close()
-            return render_template('property_details.html', property=property_details, credit_cards=credit_cards)
+            return render_template('property_details.html', property=property_details)
         else:
             cur.close()
             conn.close()
