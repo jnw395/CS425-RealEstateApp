@@ -37,4 +37,17 @@ body {
   .address-info {
     margin-top: 10px;
   }
+
+  .view-profile-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      text-align: center;
+    }
   
