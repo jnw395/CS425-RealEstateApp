@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Property Details</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .property { margin-bottom: 20px; }
+    .label { font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <h2>Property Details</h2>
+  <div class="property">
+    <p><span class="label">City:</span> {{ property.city }}</p>
+    <p><span class="label">State:</span> {{ property.state }}</p>
+    <p><span class="label">Price:</span> ${{ property.price | round(2) }}</p>
+    <p><span class="label">Bedrooms:</span> {{ property.num_bedrooms }}</p>
+    <p><span class="label">Type:</span> {{ property.property_type }}</p>
+    <p><span class="label">Description:</span> {{ property.description }}</p>
+
+    <h3>Booking Details</h3>
+    <form action="/api/book" method="POST">
+      <input type="hidden" name="property_id" value="{{ property.property_id }}">
+      <label for="start_date">Start Date:</label>
+      <input type="date" id="start_date" name="start_date" required><br><br>
+
+      <label for="end_date">End Date:</label>
+      <input type="date" id="end_date" name="end_date" required><br><br>
+
+      <label for="credit_card">Credit Card:</label>
+      <select name="credit_card" id="credit_card" required>
+        <option value="">Select Credit Card</option>
+        {% for card in credit_cards %}
+          <option value="{{ card.card_number }}">{{ card.card_number }} - Exp: {{ card.expiration_date }}</option>
+        {% endfor %}
+      </select><br><br>
+
+      <button type="submit">Confirm Booking</button>
+    </form>
+  </div>
+
+  <a href="/renter_dash">Back to Dashboard</a>
+
+</body>
+</html>

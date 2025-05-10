@@ -34,26 +34,44 @@ def search_properties():
     state = data.get('state')
     price_min = data.get('price_min')
     price_max = data.get('price_max')
-
+    property_type = data.get('property_type')
+    bedrooms = data.get('bedrooms')
+    
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
 
         # Search for properties(filter by location and price)
+        # Left join to also get num_bedrooms
         query = """
-            SELECT property_id, city, p_state, price, description
-            FROM property
-            WHERE (%s IS NULL OR city ILIKE %s)
-            AND (%s IS NULL OR p_state ILIKE %s)
-            AND (%s IS NULL OR price >= %s)
-            AND (%s IS NULL OR price <= %s)
+            SELECT 
+                p.property_id,
+                p.city,
+                p.p_state,
+                p.price,
+                p.description,
+                p.property_type,
+                COALESCE(h.num_bedrooms, a.num_bedrooms, v.num_bedrooms) AS num_bedrooms
+            FROM property p
+            LEFT JOIN house h ON p.property_id = h.property_id
+            LEFT JOIN apartments a ON p.property_id = a.property_id
+            LEFT JOIN vacation_home v ON p.property_id = v.property_id
+            WHERE (%s IS NULL OR p.city ILIKE %s)
+              AND (%s IS NULL OR p.p_state ILIKE %s)
+              AND (%s IS NULL OR p.price >= %s)
+              AND (%s IS NULL OR p.price <= %s)
+              AND (%s IS NULL OR p.property_type ILIKE %s)
+              AND (%s IS NULL OR COALESCE(h.num_bedrooms, a.num_bedrooms, v.num_bedrooms) <= %s)
         """
         cur.execute(query, (
             city, f"%{city}%",
             state, f"%{state}%",
             price_min, price_min,
-            price_max, price_max
+            price_max, price_max,
+            property_type, f"%{property_type}%" if property_type else None,
+            bedrooms, bedrooms 
         ))
+
         rows = cur.fetchall()
 
         cur.close()
@@ -64,7 +82,10 @@ def search_properties():
             "city": r[1],
             "state": r[2],
             "price": float(r[3]),
-            "description": r[4]
+            "description": r[4],
+            "property_type": r[5],
+            "bedrooms": r[6]
+
         } for r in rows]
 
         return jsonify({"results": results})
@@ -78,36 +99,42 @@ def search_properties():
 def view_booking_page():
     return render_template('view_booking.html')
 
-# Make booking
+# Make booking w/payment
 @property_bp.route('/api/book', methods=['POST'])
 def book_property():
-    data = request.get_json()
-    renter_id = session.get('renter_id')  
-    property_id = data.get('property_id')
-    start_date = data.get('start_date')
-    end_date = data.get('end_date')
+    data = request.form
+    property_id = data['property_id']
+    start_date = data['start_date']
+    end_date = data['end_date']
+    credit_card_number = data['credit_card']  # The selected credit card number
 
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
 
-        if not (property_id and start_date and end_date):
-            return jsonify({"error": "Missing booking details."}), 400
+        # Check if the selected credit card exists
+        query = "SELECT * FROM credit_card WHERE card_number = %s"
+        cur.execute(query, (credit_card_number,))
+        card = cur.fetchone()
 
-        # Insert into bookings table
-        cur.execute("""
-            INSERT INTO booking (renter_id, property_id, start_date, end_date)
+        if not card:
+            return jsonify({"message": "Invalid credit card selected."}), 400
+        
+        # Insert the booking into the bookings table
+        query = """
+            INSERT INTO bookings (property_id, start_date, end_date, credit_card_number)
             VALUES (%s, %s, %s, %s)
-        """, (renter_id, property_id, start_date, end_date))
-
+        """
+        cur.execute(query, (property_id, start_date, end_date, credit_card_number))
         conn.commit()
+
         cur.close()
         conn.close()
 
-        return jsonify({"message": "Booking successful!"})
-
+        return jsonify({"message": "Booking confirmed!"}), 200
+    
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"message": f"Error: {str(e)}"}), 500
 
 # View booking
 @property_bp.route('/view_booking')
@@ -136,4 +163,55 @@ def view_bookings():
 
     except Exception as e:
         return jsonify({"error": f"Error: {str(e)}"}), 500
+
+@property_bp.route('/property-details/<property_id>', methods=['GET'])
+def property_details(property_id):
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+
+        # Query to get details for a certain property
+        query = """
+            SELECT 
+                p.property_id,
+                p.city,
+                p.p_state,
+                p.price,
+                p.description,
+                p.property_type,
+                COALESCE(h.num_bedrooms, a.num_bedrooms, v.num_bedrooms) AS num_bedrooms
+            FROM property p
+            LEFT JOIN house h ON p.property_id = h.property_id
+            LEFT JOIN apartments a ON p.property_id = a.property_id
+            LEFT JOIN vacation_home v ON p.property_id = v.property_id
+            WHERE p.property_id = %s
+        """
+        cur.execute(query, (property_id,))
+        row = cur.fetchone()
+
+        if row:
+            # find credit card for the respective renter
+            email = session.get('user_email')  # Assuming user email is stored in session
+            cur.execute("SELECT card_number, expiration_date FROM credit_card WHERE email = %s", (email,))
+            credit_cards = cur.fetchall()
+
+            property_details = {
+                "property_id": row[0],
+                "city": row[1],
+                "state": row[2],
+                "price": float(row[3]),
+                "description": row[4],
+                "property_type": row[5],
+                "num_bedrooms": row[6]
+            }
+            cur.close()
+            conn.close()
+            return render_template('property_details.html', property=property_details, credit_cards=credit_cards)
+        else:
+            cur.close()
+            conn.close()
+            return "Property not found", 404
     
+    except Exception as e:
+        return jsonify({"message": f"Error: {str(e)}"}), 500
+
