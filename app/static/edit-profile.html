@@ -19,7 +19,9 @@
     <form id="profileForm">
       <input type="text" id="first_name" placeholder="First Name (Optional)"><br>
       <input type="text" id="last_name" placeholder="Last Name (Optional)"><br>
-      <input type="email" id="email" placeholder="Email" disabled><br>
+      <input type="password" id="current_password" placeholder="Current Password (Required to make changes)" required><br>
+      <input type="password" id="new_password" placeholder="New Password (Optional)"><br>
+
       <button type="submit">Save Changes</button>
     </form>
   </div>
@@ -102,18 +104,29 @@
     }
 
     document.getElementById('profileForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const res = await fetch('/api/edit-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          first_name: document.getElementById('first_name').value,
-          last_name: document.getElementById('last_name').value
-        })
-      });
-      const data = await res.json();
-      alert(data.message);
+    e.preventDefault();
+
+    const payload = {
+      first_name: document.getElementById('first_name').value,
+      last_name: document.getElementById('last_name').value,
+      current_password: document.getElementById('current_password').value
+    };
+
+    const newPassword = document.getElementById('new_password').value;
+    if (newPassword) {
+      payload.new_password = newPassword;
+    }
+
+    const res = await fetch('/api/edit-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
+
+    const data = await res.json();
+    alert(data.message);
+  });
+
 
     document.getElementById('addCardForm').addEventListener('submit', async (e) => {
       e.preventDefault();
