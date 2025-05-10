@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Reward Status</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <h2>Your Rewards</h2>
+  <p>You have <strong>{{ points }}</strong> points.</p>
+  <p>That's worth <strong>${{ value }}</strong> in discounts.</p>
+  <a href="/view-profile.html"><button>Back to Profile</button></a>
+</body>
+</html>

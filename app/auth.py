@@ -1,4 +1,4 @@
-from flask import Blueprint, session, request, jsonify, send_from_directory
+from flask import Blueprint, session, request, render_template, redirect, jsonify, send_from_directory
 import psycopg2, bcrypt, os
 from dotenv import load_dotenv
 
@@ -71,7 +71,6 @@ def view_profile():
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
 
-        # Get basic user info
         cur.execute('SELECT first_name, last_name FROM "user" WHERE email = %s', (email,))
         user_row = cur.fetchone()
         if not user_row:
@@ -79,7 +78,6 @@ def view_profile():
 
         first_name, last_name = user_row
 
-        # Get credit cards
         cur.execute("""
             SELECT id, last_four, exp_month, exp_year
             FROM credit_card
@@ -90,7 +88,6 @@ def view_profile():
             for row in cur.fetchall()
         ]
 
-        # Get addresses
         cur.execute("""
             SELECT id, street, city, state, zip
             FROM address
@@ -236,15 +233,12 @@ def profile_details():
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
 
-        # Get name
         cur.execute('SELECT first_name, last_name FROM "user" WHERE email = %s', (email,))
         name_row = cur.fetchone()
 
-        # Get credit cards
         cur.execute('SELECT card_number, cardholder_name, expiration_date FROM credit_card WHERE email = %s', (email,))
         cards = cur.fetchall()
 
-        # Get addresses
         cur.execute('SELECT address_id, address_line FROM address WHERE email = %s', (email,))
         addresses = cur.fetchall()
 
@@ -268,7 +262,7 @@ def add_card():
     card_number = data.get('card_number')
     cardholder_name = data.get('cardholder_name')
     expiration_date = data.get('expiration_date')
-    billing_address_id = data.get('billing_address_id')  # Optional
+    billing_address_id = data.get('billing_address_id')
 
     if not all([card_number, cardholder_name, expiration_date]):
         return jsonify({"message": "Missing fields."}), 400
@@ -329,7 +323,7 @@ def delete_address():
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
-        # Make sure the address isn't linked to a credit card
+        #makes sure address isn't linked to a cc
         cur.execute("SELECT COUNT(*) FROM credit_card WHERE billing_address_id = %s", (address_id,))
         if cur.fetchone()[0] > 0:
             return jsonify({"message": "Cannot delete an address linked to a card."}), 400
@@ -378,4 +372,57 @@ def login():
         cur.close()
         conn.close()
 
+#reward program -------------------------------------------------------------------------
 
+@auth.route('/reward-program')
+def reward_program_page():
+    email = session.get('user_email')
+    if not email:
+        return redirect('/login')
+
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+        cur.execute("SELECT reward_pts FROM reward_program WHERE email = %s", (email,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if row:
+            #user enrolled should see pts and worth
+            points = row[0]
+            value = points // 100
+            return render_template('reward_status.html', points=points, value=value)
+        else:
+            #user not enrolled so sees enroll pg
+            return render_template('reward_enroll.html')
+
+    except Exception as e:
+        return f"Error: {e}", 500
+
+@auth.route('/api/enroll-reward', methods=['POST'])
+def enroll_reward():
+    email = session.get('user_email')
+    if not email:
+        return jsonify({'message': 'Not logged in'}), 401
+
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+
+        #check if enrolled
+        cur.execute("SELECT 1 FROM reward_program WHERE email = %s", (email,))
+        if cur.fetchone():
+            cur.close()
+            conn.close()
+            return redirect('/reward-status.html') 
+
+        #enrolled with 0 pts
+        cur.execute("INSERT INTO reward_program (reward_pts, email) VALUES (%s, %s)", (0, email))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return redirect('/reward-status.html')
+    except Exception as e:
+        return jsonify({'message': f'Server error: {str(e)}'}), 500

@@ -1,0 +1,40 @@
+/* styles.css */
+
+body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    background-color: #fff;
+    color: #000;
+  }
+  
+  input, select, textarea {
+    margin: 5px 0;
+    padding: 8px;
+    width: 250px;
+  }
+  
+  button {
+    padding: 8px 16px;
+    background-color: #007BFF;
+    border: none;
+    color: white;
+    cursor: pointer;
+  }
+  
+  button:hover {
+    background-color: #0056b3;
+  }
+  
+  .msg {
+    margin-top: 10px;
+    color: red;
+  }
+  
+  .container {
+    margin-bottom: 20px;
+  }
+  
+  .address-info {
+    margin-top: 10px;
+  }
+  
