@@ -133,7 +133,8 @@ FOREIGN KEY (booking_id) REFERENCES booking(booking_id)
 --Weak
 CREATE TABLE reward_program(
 reward_id varchar(8),
-reward_pts int,
+reward_pts int default 0,
+enrolled boolean default false,
 email varchar(100) REFERENCES prospective_renter (email) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
