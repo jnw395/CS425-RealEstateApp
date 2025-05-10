@@ -61,7 +61,7 @@ def register():
 #profile (view)---------------------------------------------------------------------------------
 @auth.route('/api/view-profile')
 def view_profile():
-    email = session.get('user_email')
+    email = session.get('email')
     if not email:
         return jsonify({'message': 'Not logged in'}), 401
 
@@ -235,7 +235,7 @@ def login_page():
 
 @auth.route('/api/profile/details')
 def profile_details():
-    email = session.get('user_email')
+    email = session.get('email')
     if not email:
         return jsonify({'message': 'Not logged in'}), 401
     try:
@@ -267,6 +267,81 @@ def profile_details():
     except Exception as e:
         return jsonify({'message': f'Server error: {str(e)}'}), 500
     
+
+
+@auth.route('/api/get-cards-and-addresses', methods=['GET'])
+def get_cards_and_addresses():
+    """
+    Retrieves credit card and address information for the logged-in user
+    from the database tables 'credit_card' and 'address'.
+    """
+    conn = None  # Initialize conn outside the try block
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cursor = conn.cursor()  # Use the default cursor
+
+        email = session.get('email')
+        if not email:
+            if conn:
+                conn.close()
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        # Fetch credit card information for the user.
+        cursor.execute(
+            "SELECT card_number, expiration_date FROM credit_card WHERE email = %s",
+            (email,)
+        )
+        card_data = cursor.fetchall()
+        card_columns = [desc[0] for desc in cursor.description]
+        cards = [dict(zip(card_columns, row)) for row in card_data]
+
+        # Fetch address information for the user.
+        cursor.execute(
+            "SELECT house_number, street, city, addr_state, zip_code "
+            "FROM address WHERE email = %s",
+            (email,)
+        )
+        address_data = cursor.fetchall()
+        address_columns = [desc[0] for desc in cursor.description]
+        addresses = [dict(zip(address_columns, row)) for row in address_data]
+
+        cursor.close()
+        if conn:
+            conn.close()
+
+        # Format the data. Handle potential None values in expiration_date
+        formatted_cards = [
+            {
+                'card_number': card['card_number'],
+                'expiration': card.get('expiration_date').strftime('%m/%y') if card.get('expiration_date') else None
+            }
+            for card in cards
+        ]
+        formatted_addresses = [
+            {
+                'house_number': addr['house_number'],
+                'street': addr['street'],
+                'city': addr['city'],
+                'addr_state': addr['addr_state'],
+                'zip_code': addr['zip_code']
+            }
+            for addr in addresses
+        ]
+
+        return jsonify({'cards': formatted_cards, 'addresses': formatted_addresses}), 200
+
+    except psycopg2.Error as e:
+        print(f"Database error: {e}")
+        if conn:
+            conn.rollback()
+            conn.close()
+        return jsonify({'error': f'Database error: {e}'}), 500
+    except Exception as e:
+        print(f"Error: {e}")
+        if conn:
+            conn.close()
+        return jsonify({'error': f'Internal server error: {e}'}), 500
+
 #profile (agent)------------------------------------------------------------------------------------
 @auth.route('/api/agent/edit-profile', methods=['POST'])  
 def agent_edit_profile():
@@ -319,43 +394,35 @@ def agent_edit_profile():
     except Exception as e:
         return jsonify({"message": f"Server error: {str(e)}"}), 500
     
-@auth.route('/api/agent/view-profile', methods=['GET'])  
-def agent_view_profile():
-    email = request.args.get('email')  
+@auth.route('/agent/view-profile', methods=['GET'])
+def agent_view_profile_page():
+    email = session.get('email')
     if not email:
-        return jsonify({"message": "Email is required."}), 400
+        return jsonify({'message': 'Not logged in'}), 401
 
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
         cur.execute("SELECT u.email, u.first_name, u.last_name, a.job_title, a.real_estate_agency "
-                    "FROM \"user\" u "
-                    "JOIN agent a ON u.email = a.email "
-                    "WHERE u.email = %s", (email,))
+                    "FROM \"user\" u JOIN agent a ON u.email = a.email WHERE u.email = %s", (email,))
         agent_data = cur.fetchone()
-
-        if not agent_data:
-            return jsonify({"message": "Agent not found."}), 404
-
-        agent_dict = {
-            'email': agent_data[0],
-            'first_name': agent_data[1],
-            'last_name': agent_data[2],
-            'job_title': agent_data[3],
-            'real_estate_agency': agent_data[4]
-        }
-        
         cur.close()
         conn.close()
 
-        return jsonify(agent_dict), 200
+        if not agent_data:
+            return "Agent not found.", 404
+
+        return render_template('agent_profile.html', agent_data=agent_data)
+
     except Exception as e:
-        return jsonify({"message": f"Server error: {str(e)}"}), 500
+        return f"Server error: {str(e)}", 500
+
+
     
 #profile (card)------------------------------------------------------------------------
 @auth.route('/api/add-card', methods=['POST'])
 def add_card():
-    email = session.get('user_email')
+    email = session.get('email')
     data = request.get_json()
     card_number = data.get('card_number')
     cardholder_name = data.get('cardholder_name')
@@ -380,7 +447,7 @@ def add_card():
 
 @auth.route('/api/delete-card', methods=['POST'])
 def delete_card():
-    email = session.get('user_email')
+    email = session.get('email')
     data = request.get_json()
     card_number = data.get('card_number')
 
@@ -397,7 +464,7 @@ def delete_card():
 
 @auth.route('/api/add-address', methods=['POST'])
 def add_address():
-    email = session.get('user_email')
+    email = session.get('email')
     data = request.get_json()
 
     try:
@@ -424,9 +491,16 @@ def add_address():
 
 @auth.route('/api/delete-address', methods=['POST'])
 def delete_address():
-    email = session.get('user_email')
+    email = session.get('email')
     data = request.get_json()
-    addr = data.get('address', {})
+    house_number = data.get('house_number')
+    street = data.get('street')
+    city = data.get('city')
+    addr_state = data.get('addr_state')
+    zip_code = data.get('zip_code')
+
+    if not all([house_number, street, city, addr_state, zip_code]):
+        return jsonify({"message": "Error: Missing address details."}), 400
 
     try:
         conn = psycopg2.connect(**DB_PARAMS)
@@ -438,19 +512,21 @@ def delete_address():
             AND addr_state = %s AND zip_code = %s
         """, (
             email,
-            addr['house_number'],
-            addr['street'],
-            addr['city'],
-            addr['addr_state'],
-            addr['zip_code']
+            house_number,
+            street,
+            city,
+            addr_state,
+            zip_code
         ))
         conn.commit()
         cur.close()
         conn.close()
         return jsonify({"message": "Address deleted."})
     except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
         return jsonify({"message": f"Error: {str(e)}"}), 500
-
 
 #login -------------------------------------------------------------------------------------
 @auth.route('/api/login', methods=['POST'])
@@ -467,7 +543,7 @@ def login():
         result = cur.fetchone()
 
         if result and result[0] == password: 
-            session['user_email'] = email
+            session['email'] = email
             
             if result[1] == 'renter':
                 return jsonify({"message": "Login successful!", "redirect_url": "/renter_dash", "role": "renter"})
@@ -487,7 +563,7 @@ def login():
 
 @auth.route('/reward-program')
 def reward_program_page():
-    email = session.get('user_email')
+    email = session.get('email')
     if not email:
         return redirect('/login')
 
@@ -511,9 +587,49 @@ def reward_program_page():
     except Exception as e:
         return f"Error: {e}", 500
 
+@auth.route('/api/check-reward-enrollment')
+def check_reward_enrollment():
+    email = session.get('email')
+    if not email:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        with psycopg2.connect(**DB_PARAMS) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM reward_program WHERE email = %s", (email,))
+                enrolled = cur.fetchone() is not None
+                return jsonify({'enrolled': enrolled})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@auth.route('/enroll-status')
+def enroll_status():
+    email = session.get('email')
+    if not email:
+        return redirect('/login')
+
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+        cur.execute("SELECT reward_pts FROM reward_program WHERE email = %s", (email,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if row:
+            points = row[0]
+            value = points // 100
+            return render_template('reward_status.html', points=points, value=value)
+        else:
+            # User not enrolled, show enrollment page
+            return render_template('reward_enroll')
+    except Exception as e:
+        return f"Error fetching enrollment status: {e}", 500
+
+
 @auth.route('/api/enroll-reward', methods=['POST'])
 def enroll_reward():
-    email = session.get('user_email')
+    email = session.get('email')
     if not email:
         return jsonify({'message': 'Not logged in'}), 401
 
@@ -526,7 +642,7 @@ def enroll_reward():
         if cur.fetchone():
             cur.close()
             conn.close()
-            return redirect('/reward-status') 
+            return redirect('/reward_status') 
 
         #enrolled with 0 pts
         cur.execute("INSERT INTO reward_program (reward_pts, email) VALUES (%s, %s)", (0, email))
@@ -534,6 +650,36 @@ def enroll_reward():
         cur.close()
         conn.close()
 
-        return redirect('/reward-status')
+        return redirect('/reward_status')
     except Exception as e:
         return jsonify({'message': f'Server error: {str(e)}'}), 500
+
+
+
+
+#agent dash ------------------------------------------------------
+@auth.route('/agent-dash')
+def agent_dashboard():
+    email = session.get('email')
+    
+    if not email:
+        return redirect('/login')
+
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+
+        # Query the 'user' table instead of 'users'
+        cur.execute("SELECT role FROM user WHERE email = %s", (email,))
+        user = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if user and user[0] == 'agent':
+            return render_template('agent_dashboard.html', email=email)
+
+        else:
+            return redirect('/login')
+
+    except Exception as e:
+        return f"Error: {e}", 500

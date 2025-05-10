@@ -12,52 +12,37 @@
 <body>
     <h2>Welcome to Your Dashboard</h2>
 
-<<<<<<< HEAD
     <h3>Search Properties</h3>
     <form id="searchForm">
         <input type="text" id="city" placeholder="City">
         <input type="text" id="state" placeholder="State">
         <input type="number" id="price_min" placeholder="Min Price">
         <input type="number" id="price_max" placeholder="Max Price">
+
+        <select id="property_type">
+            <option value="">Any Property Type</option>
+            <option value="house">House</option>
+            <option value="apartments">Apartments</option>
+            <option value="vacation_home">Vacation Home</option>
+            <option value="land">Land</option>
+            <option value="com_bldgs">Commercial Building</option>
+        </select>
+
+        <input type="number" id="bedrooms" placeholder="Max Bedrooms">
+
         <button type="submit">Search</button>
     </form>
 
     <div class="results" id="results"></div>
-=======
-  <h3>Search Properties</h3>
-  <form id="searchForm">
-    <input type="text" id="city" placeholder="City">
-    <input type="text" id="state" placeholder="State">
-    <input type="number" id="price_min" placeholder="Min Price">
-    <input type="number" id="price_max" placeholder="Max Price">
-  
-    <select id="property_type">
-      <option value="">Any Property Type</option>
-      <option value="house">House</option>
-      <option value="apartments">Apartments</option>
-      <option value="vacation_home">Vacation Home</option>
-      <option value="land">Land</option>
-      <option value="com_bldgs">Commercial Building</option>
-    </select>
 
-    <input type="number" id="bedrooms" placeholder="Max Bedrooms">
-
-    <button type="submit">Search</button>
-  </form>
-
-
-  <div class="results" id="results"></div>
->>>>>>> cc5d584e8d8f83aaa1f830b9f23b95bf81139327
-
-    <a href="/view-profile"> <button class="view-profile-btn">View Profile</button></a>
-
+    <a href="/view-profile"><button class="view-profile-btn">View Profile</button></a>
     <button id="rewardsButton">Rewards</button>
 
     <script>
+        // Handle property search
         document.getElementById('searchForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-<<<<<<< HEAD
             const res = await fetch('/api/search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -66,28 +51,15 @@
                     state: document.getElementById('state').value || null,
                     price_min: document.getElementById('price_min').value || null,
                     price_max: document.getElementById('price_max').value || null,
+                    property_type: document.getElementById('property_type').value || null,
+                    bedrooms: document.getElementById('bedrooms').value || null
                 })
             });
-=======
-      const res = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          city: document.getElementById('city').value || null,
-          state: document.getElementById('state').value || null,
-          price_min: document.getElementById('price_min').value || null,
-          price_max: document.getElementById('price_max').value || null,
-          property_type: document.getElementById('property_type').value || null,
-          bedrooms: document.getElementById('bedrooms').value || null
-        })
-      });
->>>>>>> cc5d584e8d8f83aaa1f830b9f23b95bf81139327
 
             const data = await res.json();
             const resultsDiv = document.getElementById('results');
             resultsDiv.innerHTML = '';
 
-<<<<<<< HEAD
             if (data.results && data.results.length > 0) {
                 data.results.forEach(p => {
                     const div = document.createElement('div');
@@ -95,75 +67,29 @@
                     div.innerHTML = `
                         <strong>${p.city}, ${p.state}</strong><br>
                         Price: $${Number(p.price).toLocaleString()}<br>
-                        ${p.description}<br><br>
-
-                        <label for="start_date_${p.property_id}">Start Date:</label>
-                        <input type="date" id="start_date_${p.property_id}" required><br>
-                        <label for="end_date_${p.property_id}">End Date:</label>
-                        <input type="date" id="end_date_${p.property_id}" required><br>
-                        <button onclick="bookProperty(${p.property_id})">Book Now</button>
+                        <strong>Bedrooms:</strong> ${p.bedrooms ?? 'N/A'}<br>
+                        <strong>Type:</strong> ${p.property_type ?? 'N/A'}<br>
+                        <strong>Description:</strong> ${p.description}<br><br>
+                        <a href="/property-details/${p.property_id}" class="button-link">View Property Details</a>
                     `;
-                    resultsDiv.appendChild(div)
+                    resultsDiv.appendChild(div);
                 });
             } else {
-                resultsDiv.innerText = 'No results found.';
+                resultsDiv.innerHTML = '<p>No results found.</p>';
             }
-=======
-      if (data.results && data.results.length > 0) {
-        data.results.forEach(p => {
-          const div = document.createElement('div');
-          div.className = 'property';
-          div.innerHTML = `
-            <strong>${p.city}, ${p.state}</strong><br>
-            Price: $${Number(p.price).toLocaleString()}<br>
-            <strong>Bedrooms:</strong> ${p.bedrooms ?? 'N/A'}<br>
-            <strong>Type:</strong> ${p.property_type ?? 'N/A'}<br>
-            <strong>Description:</strong> ${p.description}<br><br>
-
-            <a href="/property-details/${p.property_id}" class="button-link">View Property Details</a>
-            `;
-        resultsDiv.appendChild(div)
->>>>>>> cc5d584e8d8f83aaa1f830b9f23b95bf81139327
         });
 
-<<<<<<< HEAD
-        //book button under every property
-        async function bookProperty(propertyId) {
-            const startDate = document.getElementById(`start_date_${propertyId}`).value;
-            const endDate = document.getElementById(`end_date_${propertyId}`).value;
-
-            if (!startDate || !endDate) {
-                return alert("Please enter both start and end dates.");
-            }
-
-            const res = await fetch('/api/book', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    property_id: propertyId,
-                    start_date: startDate,
-                    end_date: endDate
-                })
-            });
-
-            const data = await res.json();
-            alert(data.message || data.error);
-        }
-
+        // Handle Rewards button
         document.getElementById('rewardsButton').addEventListener('click', async () => {
-            const res = await fetch('/api/check-rewards-enrollment');
-            const data = await res.json();
+            try {
+                const res = await fetch('/api/check-reward-enrollment');
+                const data = await res.json();
 
-            if (data.enrolled) {
-                window.location.href = '/reward_status'; 
-            } else {
-                window.location.href = '/rewards_enroll';
+                window.location.href = '/reward-program';
+            } catch (error) {
+                alert('Error checking reward status. Please try again later.');
             }
         });
-
     </script>
-=======
-  </script>
->>>>>>> cc5d584e8d8f83aaa1f830b9f23b95bf81139327
 </body>
 </html>

@@ -23,8 +23,7 @@
 
   <div class="results" id="results"></div>
 
-  <a href="/"> <button class="view-profile-btn">View Profile</button></a>
-
+  <button id="viewAgentProfileBtn" class="view-profile-btn">View Profile</button>
 
   <script>
     document.getElementById('searchForm').addEventListener('submit', async (e) => {
@@ -59,14 +58,23 @@
             <label for="end_date_${p.property_id}">End Date:</label>
             <input type="date" id="end_date_${p.property_id}" required><br>
             <button onclick="bookProperty(${p.property_id})">Book Now</button>
-            `;
-        resultsDiv.appendChild(div)
+          `;
+          resultsDiv.appendChild(div);
         });
       } else {
         resultsDiv.innerText = 'No results found.';
       }
     });
 
-    //Add/Delete/Modify properties
-    
+    // Redirect to agent profile page on click
+    document.getElementById('viewAgentProfileBtn').addEventListener('click', () => {
+      window.location.href = '/agent/view-profile';
+    });
 
+    // Stub: bookProperty (if needed)
+    function bookProperty(propertyId) {
+      alert(`Booking function not implemented for property ${propertyId}`);
+    }
+  </script>
+</body>
+</html>

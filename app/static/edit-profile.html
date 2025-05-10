@@ -19,9 +19,10 @@
         <form id="profileForm">
             <input type="text" id="first_name" placeholder="First Name (Optional)"><br>
             <input type="text" id="last_name" placeholder="Last Name (Optional)"><br>
+            <input type="email" id="email" placeholder="Email" readonly><br>
             <input type="password" id="current_password" placeholder="Current Password (Required to make changes)" required><br>
             <input type="password" id="new_password" placeholder="New Password (Optional)"><br>
-
+            <div id="profile_message" class="msg"></div> <br>
             <button type="submit">Save Changes</button>
         </form>
     </div>
@@ -31,7 +32,7 @@
         <form id="addCardForm">
             <input type="text" id="card_number" placeholder="Card Number" maxlength="16" required><br>
             <input type="text" id="expiration" placeholder="Expiration Date (MM/YY)" required><br>
-            <select id="billing_address" required>
+            <select id="billing_address_select" required>
                 <option value="">Select Billing Address</option>
             </select><br>
             <button type="submit">Add Credit Card</button>
@@ -59,61 +60,96 @@
         document.addEventListener("DOMContentLoaded", () => {
             fetchProfile();
             fetchCardsAndAddresses();
-             document.getElementById('backToProfile').addEventListener('click', () => {
-                window.location.href = '/view-profile'; 
+            document.getElementById('backToProfile').addEventListener('click', () => {
+                window.location.href = '/view-profile';
             });
         });
 
         async function fetchProfile() {
-            const res = await fetch('/api/profile');
-            const data = await res.json();
-            if (data.first_name || data.last_name) {
-                document.getElementById('first_name').value = data.first_name || '';
-                document.getElementById('last_name').value = data.last_name || '';
+          try {
+            const res = await fetch('/api/edit-profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json(); // read once here
+            console.log("Response from /api/edit-profile:", data);
+
+            if (res.ok) {
+                messageDiv.textContent = "Profile updated successfully.";
+                messageDiv.style.color = "green";
+            } else {
+                messageDiv.textContent = data.message || "An error occurred.";
+                messageDiv.style.color = "red";
             }
-            document.getElementById('email').value = data.email;
+        } catch (error) {
+            console.error("Error submitting profile form:", error);
+            messageDiv.textContent = "Failed to update profile. Please check your connection.";
+            messageDiv.style.color = "red";
+        }
+
         }
 
         async function fetchCardsAndAddresses() {
-            const res = await fetch('/api/get-cards-and-addresses');
-            const data = await res.json();
+            try {
+                const res = await fetch('/api/get-cards-and-addresses');
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    throw new Error(`Failed to fetch cards and addresses: ${res.status} - ${errorText}`);
+                }
+                const data = await res.json();
+                console.log("Cards and Addresses Data:", data);
+                const creditCardList = document.getElementById('creditCardList');
+                creditCardList.innerHTML = '';
+                if (data.cards) {
+                    data.cards.forEach(card => {
+                        const cardDiv = document.createElement('div');
+                        cardDiv.innerHTML = `
+                            <span>${card.card_number} - ${card.expiration}</span>
+                            <button onclick="deleteCard('${card.id}')">Delete</button>
+                            <button onclick="editCard('${card.id}')">Edit</button>
+                        `;
+                        creditCardList.appendChild(cardDiv);
+                    });
+                }
 
-            const creditCardList = document.getElementById('creditCardList');
-            creditCardList.innerHTML = '';
-            data.cards.forEach(card => {
-                const cardDiv = document.createElement('div');
-                cardDiv.innerHTML = `
-                    <span>${card.card_number} - ${card.expiration}</span>
-                    <button onclick="deleteCard('${card.id}')">Delete</button>
-                    <button onclick="editCard('${card.id}')">Edit</button>
-                `;
-                creditCardList.appendChild(cardDiv);
-            });
+                const billingAddressSelect = document.getElementById('billing_address_select');
+                billingAddressSelect.innerHTML = '<option value="">Select Billing Address</option>';
+                if (data.addresses) {
+                    data.addresses.forEach(address => {
+                        const option = document.createElement('option');
+                        option.value = address.id;
+                        option.innerText = `${address.house_number} ${address.street}, ${address.city}, ${address.addr_state} ${address.zip_code}`;
+                        billingAddressSelect.appendChild(option);
+                    });
+                }
 
-            const billingAddressSelect = document.getElementById('billing_address');
-            billingAddressSelect.innerHTML = '<option value="">Select Billing Address</option>';
-            data.addresses.forEach(address => {
-                const option = document.createElement('option');
-                option.value = address.id;
-                option.innerText = `${address.house_number} ${address.street}, ${address.city}, ${address.addr_state} ${address.zip_code}`;
-                billingAddressSelect.appendChild(option);
-            });
+                const addressList = document.getElementById('addressList');
+                addressList.innerHTML = '';
+                if (data.addresses) {
+                    data.addresses.forEach(address => {
+                        const addressDiv = document.createElement('div');
+                        addressDiv.innerHTML = `
+                            <span>${address.house_number} ${address.street}, ${address.city}, ${address.addr_state} ${address.zip_code}</span>
+                            <button onclick="deleteAddress('${address.id}')">Delete</button>
+                        `;
+                        addressList.appendChild(addressDiv);
+                    });
+                }
 
-            const addressList = document.getElementById('addressList');
-            addressList.innerHTML = '';
-            data.addresses.forEach(address => {
-                const addressDiv = document.createElement('div');
-                addressDiv.innerHTML = `
-                    <span>${address.house_number} ${address.street}, ${address.city}, ${address.addr_state} ${address.zip_code}</span>
-                    <button onclick="deleteAddress('${address.id}')">Delete</button>
-                `;
-                addressList.appendChild(addressDiv);
-            });
+            } catch (error) {
+                console.error("Error fetching cards and addresses:", error);
+                alert("Failed to load data. Please check your connection and try again.  See console for details.");
+            }
         }
+
+
 
         document.getElementById('profileForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-
+            const messageDiv = document.getElementById('profile_message');
+            messageDiv.textContent = '';
             const payload = {
                 first_name: document.getElementById('first_name').value,
                 last_name: document.getElementById('last_name').value,
@@ -125,64 +161,112 @@
                 payload.new_password = newPassword;
             }
 
-            const res = await fetch('/api/edit-profile', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            try {
+                const res = await fetch('/api/edit-profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
 
-            const data = await res.json();
-            alert(data.message);
+                const data = await res.json();
+                console.log("Response from /api/edit-profile:", data);
+                if (res.ok) {
+                    messageDiv.textContent = "Profile updated successfully.";
+                    messageDiv.style.color = "green";
+                } else {
+                    const errorText = await res.text();
+                    messageDiv.textContent = data.message || errorText || "An error occurred.";
+                    messageDiv.style.color = "red";
+                }
+            } catch (error) {
+                console.error("Error submitting profile form:", error);
+                messageDiv.textContent = "Failed to update profile. Please check your connection.";
+                messageDiv.style.color = "red";
+            }
+
         });
 
 
         document.getElementById('addCardForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const res = await fetch('/api/add-card', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    card_number: document.getElementById('card_number').value,
-                    expiration: document.getElementById('expiration').value,
-                    billing_address_id: document.getElementById('billing_address').value
-                })
-            });
-            const data = await res.json();
-            alert(data.message);
-            fetchCardsAndAddresses();
+            try {
+                const res = await fetch('/api/add-card', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        card_number: document.getElementById('card_number').value,
+                        expiration: document.getElementById('expiration').value,
+                        billing_address_id: document.getElementById('billing_address_select').value
+                    })
+                });
+                const data = await res.json();
+                alert(data.message);
+                fetchCardsAndAddresses();
+            } catch (error) {
+                console.error("Error submitting addCardForm:", error);
+                alert("Failed to add card. Please check your connection.");
+            }
+
         });
 
         document.getElementById('addAddressForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const payload = {  
+            const payload = {
                 house_number: document.getElementById('house_number').value,
                 street: document.getElementById('street').value,
                 city: document.getElementById('city').value,
                 addr_state: document.getElementById('addr_state').value,
                 zip_code: document.getElementById('zip_code').value
             };
-            const res = await fetch('/api/add-address', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            alert(data.message);
-            fetchCardsAndAddresses();
+            try {
+                const res = await fetch('/api/add-address', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                alert(data.message);
+                fetchCardsAndAddresses();
+            } catch (error) {
+                console.error("Error submitting addAddressForm:", error);
+                alert("Failed to add address. Please check your connection.");
+            }
+
         });
 
         async function deleteCard(cardId) {
-            const res = await fetch(`/api/delete-card/${cardId}`, { method: 'DELETE' });
-            const data = await res.json();
-            alert(data.message);
-            fetchCardsAndAddresses();
+            try {
+                const res = await fetch(`/api/delete-card/${cardId}`, { method: 'DELETE' });
+                const data = await res.json();
+                alert(data.message);
+                fetchCardsAndAddresses();
+            } catch (error) {
+                console.error("Error deleting card:", error);
+                alert("Failed to delete card. Please check your connection.");
+            }
+
         }
 
-        async function deleteAddress(addressId) {
-            const res = await fetch(`/api/delete-address/${addressId}`, { method: 'DELETE' });
-            const data = await res.json();
-            alert(data.message);
-            fetchCardsAndAddresses();
+        async function deleteAddress(house_number, street, city, addr_state, zip_code) {
+            try {
+                const res = await fetch('/api/delete-address', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        house_number: house_number,
+                        street: street,
+                        city: city,
+                        addr_state: addr_state,
+                        zip_code: zip_code
+                    })
+                });
+                const data = await res.json();
+                alert(data.message);
+                fetchCardsAndAddresses();
+            } catch (error) {
+                console.error("Error deleting address:", error);
+                alert("Failed to delete address. Please check your connection.");
+            }
         }
     </script>
 </body>
