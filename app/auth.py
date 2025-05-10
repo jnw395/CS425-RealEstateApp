@@ -11,6 +11,7 @@ DB_PARAMS = { #all info should be in a .env file on your local machine
     'password': os.getenv('DB_PASSWORD'),
     'host': os.getenv('DB_HOST'),
     'port': os.getenv('DB_PORT')
+
 }
 
 #register-------------------------------------------------------------------------
@@ -134,7 +135,7 @@ def edit_profile():
 @auth.route('/api/logout', methods=['POST'])
 def logout():
     session.clear()
-    return '', 204
+    return jsonify({"message": "Logged out"}), 200
 
 #added for now just to give register the option to go to page (still needs to be implemented)
 @auth.route('/login.html')
