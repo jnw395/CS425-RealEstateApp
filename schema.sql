@@ -91,7 +91,7 @@ email varchar(100) REFERENCES "user" (email) ON DELETE CASCADE ON UPDATE CASCADE
 house_number varchar(5),
 street varchar(20),
 city varchar(20),
-addr_state varchar(20),
+addr_state varchar(2),
 zip_code varchar(10),
 PRIMARY KEY (email, house_number, street, city, addr_state, zip_code)
 );
@@ -100,6 +100,14 @@ email varchar (100) REFERENCES prospective_renter(email) ON DELETE CASCADE ON UP
 card_number varchar(16),
 expiration_date date,
 CVV varchar(3),
+billing_house_number VARCHAR (10),
+billing_street varchar(30),
+billing_city varchar(30),
+billing_state varchar(2),
+billing_zip varchar(5),
+foreign key (email, billing_house_number, billing_street, billing_city, billing_state, billing_zip)
+    references address (email, house_number, street, city, addr_state, zip_code)
+    ON DELETE SET NULL ON UPDATE CASCADE,
 PRIMARY KEY (email, card_number)
 );
 CREATE TABLE preferred_loc(

@@ -32,10 +32,15 @@
         <form id="addCardForm">
             <input type="text" id="card_number" placeholder="Card Number" maxlength="16" required><br>
             <input type="text" id="expiration" placeholder="Expiration Date (MM/YY)" required><br>
-            <input type="int" id="cvv" placeholder = "CVV" maxlength ="3" required><br>
-            <select id="billing_address_select" required>
-                <option value="">Select Billing Address</option>
-            </select><br>
+            <input type="int" id="cvv" placeholder="CVV" maxlength="3" required><br>
+
+            <h4>Billing Address</h4>
+            <input type="text" id="billing_house_number" placeholder="Billing House Number" required><br>
+            <input type="text" id="billing_street" placeholder="Billing Street" required><br>
+            <input type="text" id="billing_city" placeholder="Billing City" required><br>
+            <input type="text" id="billing_state" placeholder="Billing State" required><br>
+            <input type="text" id="billing_zip" placeholder="Billing ZIP Code" required><br>
+
             <button type="submit">Add Credit Card</button>
         </form>
 
@@ -67,29 +72,28 @@
         });
 
         async function fetchProfile() {
-          try {
-            const res = await fetch('/api/edit-profile', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            try {
+                const res = await fetch('/api/edit-profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload) // 'payload' is likely undefined here
+                });
 
-            const data = await res.json(); // read once here
-            console.log("Response from /api/edit-profile:", data);
+                const data = await res.json();
+                console.log("Response from /api/edit-profile:", data);
 
-            if (res.ok) {
-                messageDiv.textContent = "Profile updated successfully.";
-                messageDiv.style.color = "green";
-            } else {
-                messageDiv.textContent = data.message || "An error occurred.";
+                if (res.ok) {
+                    messageDiv.textContent = "Profile updated successfully.";
+                    messageDiv.style.color = "green";
+                } else {
+                    messageDiv.textContent = data.message || "An error occurred.";
+                    messageDiv.style.color = "red";
+                }
+            } catch (error) {
+                console.error("Error submitting profile form:", error);
+                messageDiv.textContent = "Failed to update profile. Please check your connection.";
                 messageDiv.style.color = "red";
             }
-        } catch (error) {
-            console.error("Error submitting profile form:", error);
-            messageDiv.textContent = "Failed to update profile. Please check your connection.";
-            messageDiv.style.color = "red";
-        }
-
         }
 
         async function fetchCardsAndAddresses() {
@@ -108,21 +112,9 @@
                         const cardDiv = document.createElement('div');
                         cardDiv.innerHTML = `
                             <span>${card.card_number} - ${card.expiration}</span>
-                            <button onclick="deleteCard('${card.id}')">Delete</button>
-                            <button onclick="editCard('${card.id}')">Edit</button>
+                            <button onclick="deleteCard('${card.card_number}')">Delete</button>
                         `;
                         creditCardList.appendChild(cardDiv);
-                    });
-                }
-
-                const billingAddressSelect = document.getElementById('billing_address_select');
-                billingAddressSelect.innerHTML = '<option value="">Select Billing Address</option>';
-                if (data.addresses) {
-                    data.addresses.forEach(address => {
-                        const option = document.createElement('option');
-                        option.value = address.id;
-                        option.innerText = `${address.house_number} ${address.street}, ${address.city}, ${address.addr_state} ${address.zip_code}`;
-                        billingAddressSelect.appendChild(option);
                     });
                 }
 
@@ -133,7 +125,7 @@
                         const addressDiv = document.createElement('div');
                         addressDiv.innerHTML = `
                             <span>${address.house_number} ${address.street}, ${address.city}, ${address.addr_state} ${address.zip_code}</span>
-                            <button onclick="deleteAddress('${address.id}')">Delete</button>
+                            <button onclick="deleteAddress('${address.house_number}', '${address.street}', '${address.city}', '${address.addr_state}', '${address.zip_code}')">Delete</button>
                         `;
                         addressList.appendChild(addressDiv);
                     });
@@ -141,11 +133,25 @@
 
             } catch (error) {
                 console.error("Error fetching cards and addresses:", error);
-                alert("Failed to load data. Please check your connection and try again.  See console for details.");
+                alert("Failed to load data. Please check your connection and try again. See console for details.");
             }
         }
 
-
+        async function deleteCard(cardNumber) {
+            try {
+                const res = await fetch('/api/delete-card', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ card_number: cardNumber })
+                });
+                const data = await res.json();
+                alert(data.message);
+                fetchCardsAndAddresses();
+            } catch (error) {
+                console.error("Error deleting card:", error);
+                alert("Failed to delete card. Please check your connection.");
+            }
+        }
 
         document.getElementById('profileForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -187,7 +193,6 @@
 
         });
 
-
         document.getElementById('addCardForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             try {
@@ -196,8 +201,13 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         card_number: document.getElementById('card_number').value,
-                        expiration: document.getElementById('expiration').value,
-                        billing_address_id: document.getElementById('billing_address_select').value
+                        expiration_date: document.getElementById('expiration').value,
+                        cvv: document.getElementById('cvv').value,
+                        billing_house_number: document.getElementById('billing_house_number').value,
+                        billing_street: document.getElementById('billing_street').value,
+                        billing_city: document.getElementById('billing_city').value,
+                        billing_state: document.getElementById('billing_state').value,
+                        billing_zip: document.getElementById('billing_zip').value
                     })
                 });
                 const data = await res.json();
@@ -207,7 +217,6 @@
                 console.error("Error submitting addCardForm:", error);
                 alert("Failed to add card. Please check your connection.");
             }
-
         });
 
         document.getElementById('addAddressForm').addEventListener('submit', async (e) => {
@@ -245,7 +254,6 @@
                 console.error("Error deleting card:", error);
                 alert("Failed to delete card. Please check your connection.");
             }
-
         }
 
         async function deleteAddress(house_number, street, city, addr_state, zip_code) {
