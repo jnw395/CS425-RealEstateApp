@@ -22,11 +22,11 @@
 
     <h3>Credit Cards</h3>
     <div id="credit-cards">
-        </div>
+    </div>
 
     <h3>Addresses</h3>
     <div id="addresses">
-        </div>
+    </div>
     <button id="editProfileButton">Edit Profile</button>
     <button id="backToDashboard">Back to Dashboard</button>
     <button id="logoutButton">Logout</button>
@@ -60,7 +60,13 @@
             if (data.cards && data.cards.length > 0) {
                 data.cards.forEach(card => {
                     const cardDiv = document.createElement('div');
-                    cardDiv.innerHTML = `<p>Card Number: ${card.card_number}, Expiration: ${card.expiration_date}</p>`;
+                    // Format the expiration date here
+                    const expirationDate = new Date(card.expiration_date);
+                    const month = String(expirationDate.getMonth() + 1).padStart(2, '0');
+                    const year = String(expirationDate.getFullYear()).slice(-2);
+                    const formattedDate = `${month}/${year}`;
+                    
+                    cardDiv.innerHTML = `<p>Card Number: ${card.card_number}, Expiration: ${formattedDate}</p>`;
                     creditCardsDiv.appendChild(cardDiv);
                 });
             } else {
