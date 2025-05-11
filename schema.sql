@@ -1,11 +1,13 @@
+
 --Strong
 CREATE TABLE neighborhood(
-neighborhood_name varchar(25) UNIQUE,
+neighborhood_name varchar(30) UNIQUE,
 crime_rate numeric(5,2),
 nearby_schools varchar(20),
 nearby_parks varchar(20),
 PRIMARY KEY(neighborhood_name)
 );
+
 CREATE TABLE "user"(
 email varchar(100) UNIQUE,
 first_name varchar (20),
@@ -72,7 +74,8 @@ num_bedrooms int,
 num_bathrooms int,
 PRIMARY KEY(property_id)
 );
-CREATE TABLE booking(
+-- Recreate the booking table with cascading delete on property_id
+CREATE TABLE booking (
 booking_id varchar(8),
 booking_date date,
 reward_pts_earned int,
@@ -81,9 +84,9 @@ start_date date,
 end_date date,
 email varchar(100),
 property_id varchar(8),
-PRIMARY KEY(booking_id),
+PRIMARY KEY (booking_id),
 FOREIGN KEY (email) REFERENCES "user"(email) ON DELETE CASCADE ON UPDATE CASCADE,
-FOREIGN KEY (property_id) REFERENCES property(property_id)
+FOREIGN KEY (property_id) REFERENCES property(property_id) ON DELETE CASCADE
 );
 --Multi-valued
 CREATE TABLE address(
@@ -117,13 +120,14 @@ pre_state varchar(20),
 priority int,
 PRIMARY KEY (email, city, pre_state)
 );
-CREATE TABLE amenities(
-property_id varchar(8) REFERENCES property(property_id),
+CREATE TABLE amenities (
+property_id varchar(8),
 kitchen boolean,
 wifi boolean,
 pool boolean,
 laundry boolean,
-PRIMARY KEY (property_id)
+PRIMARY KEY (property_id),
+FOREIGN KEY (property_id) REFERENCES property(property_id) ON DELETE CASCADE
 );
 --Relationships
 CREATE TABLE looks_at(
@@ -131,15 +135,17 @@ email varchar(100),
 booking_id varchar(8),
 PRIMARY KEY(email, booking_id),
 FOREIGN KEY (email) REFERENCES agent(email) ON DELETE CASCADE ON UPDATE CASCADE,
-FOREIGN KEY (booking_id) REFERENCES booking(booking_id)
+FOREIGN KEY (booking_id) REFERENCES booking(booking_id) ON DELETE CASCADE
 );
+
 CREATE TABLE makes(
 email varchar(100),
 booking_id varchar(8),
 PRIMARY KEY(email, booking_id),
 FOREIGN KEY (email) REFERENCES prospective_renter(email) ON DELETE CASCADE ON UPDATE CASCADE,
-FOREIGN KEY (booking_id) REFERENCES booking(booking_id)
+FOREIGN KEY (booking_id) REFERENCES booking(booking_id) ON DELETE CASCADE
 );
+
 --Weak
 CREATE TABLE reward_program(
 reward_id varchar(8),

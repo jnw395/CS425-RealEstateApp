@@ -104,14 +104,25 @@ def search_properties():
               AND (%s IS NULL OR COALESCE(h.num_bedrooms, a.num_bedrooms, v.num_bedrooms) <= %s)
             """
 
-        cur.execute(query, (
-            city, f"%{city}%",
-            state, f"%{state}%",
-            price_min, price_min,
-            price_max, price_max,
-            property_type, f"%{property_type}%" if property_type else None,
-            bedrooms, bedrooms 
-        ))
+        if role == 'agent':
+            cur.execute(query, (
+                email,
+                city, f"%{city}%" if city else None,
+                state, f"%{state}%" if state else None,
+                price_min, price_min,
+                price_max, price_max,
+                property_type, f"%{property_type}%" if property_type else None,
+                bedrooms, bedrooms
+            ))
+        else:
+            cur.execute(query, (
+                city, f"%{city}%" if city else None,
+                state, f"%{state}%" if state else None,
+                price_min, price_min,
+                price_max, price_max,
+                property_type, f"%{property_type}%" if property_type else None,
+                bedrooms, bedrooms
+            ))
 
         rows = cur.fetchall()
 
@@ -182,7 +193,8 @@ def property_details(property_id):
     
     except Exception as e:
         return jsonify({"message": f"Error: {str(e)}"}), 500
-    
+
+'''   
 # Agent get property details
 @property_bp.route('/agent-details/<property_id>', methods=['GET'])
 def agent_property_details(property_id):
@@ -244,7 +256,7 @@ def agent_property_details(property_id):
             return "Property not found", 404
     
     except Exception as e:
-        return jsonify({"message": f"Error: {str(e)}"}), 500
+        return jsonify({"message": f"Error: {str(e)}"}), 500 '''
 
 # Booking--------------------------------------------------
 
