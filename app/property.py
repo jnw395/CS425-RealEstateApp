@@ -32,6 +32,11 @@ def agent_dash_page():
 def view_bookings_page():
     return render_template('view_bookings.html')
 
+# Manage properties
+@property_bp.route('/manage_properties')
+def manage_properties_page():
+    return render_template('manage_properties.html')
+
 # Route for searching
 @property_bp.route('/api/search', methods=['POST'])
 def search_properties():
@@ -252,82 +257,126 @@ def view_bookings():
 
 
         # Display bookings
-        return render_template('view_bookings', bookings=bookings)
+        return render_template('view_bookings.html', bookings=bookings)
 
     except Exception as e:
         return jsonify({"error": f"Error: {str(e)}"}), 500
 
 # Managing properties ----------------------------------------------------------
-
-# Adding property
+    
+# Add property
 @property_bp.route('/api/add_property', methods=['POST'])
 def add_property():
     data = request.get_json()
+    email = session.get('email')  # Logged-in agent's email
+
+    if not email:
+        return jsonify({"error": "Not logged in as agent."}), 401
+
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
-        
-        cur.execute("""
-            INSERT INTO property (property_id, city, p_state, price, description, property_type)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (
+
+        cur.execute('''
+            INSERT INTO property (
+                property_id, city, p_state, description, price,
+                sq_footage, availability, property_type,
+                email, neighborhood_name
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (
             data['property_id'],
             data['city'],
             data['p_state'],
-            data['price'],
             data['description'],
-            data['property_type']
+            data['price'],
+            data.get('sq_footage'),  
+            data.get('availability', True), 
+            data['property_type'],
+            email,
+            data['neighborhood_name']
         ))
-        
+
         conn.commit()
-        cur.close()
-        conn.close()
-        return jsonify({"message": "Property added successfully."}), 200
+        return jsonify({"message": "Property added successfully!"})
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+
+    finally:
+        if conn:
+            conn.close()
+
+# Get all agent properties
+@property_bp.route('/api/agent_properties')
+def agent_properties():
+    email = session.get('email')
+
+    if not email:
+        return jsonify({"error": "Not logged in as agent."}), 401
+
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+
+        cur.execute('''
+            SELECT property_id, city, p_state, price, sq_footage, availability,
+                   property_type, description, neighborhood_name
+            FROM property
+            WHERE email = %s
+        ''', (email,))
+
+        rows = cur.fetchall()
+        properties = [
+            {
+                'property_id': row[0],
+                'city': row[1],
+                'p_state': row[2],
+                'price': float(row[3]),
+                'sq_footage': row[4],
+                'availability': row[5],
+                'property_type': row[6],
+                'description': row[7],
+                'neighborhood_name': row[8]
+            }
+            for row in rows
+        ]
+
+        return jsonify({"properties": properties})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        if conn:
+            conn.close()
+
 # Delete property
 @property_bp.route('/api/delete_property/<property_id>', methods=['DELETE'])
 def delete_property(property_id):
+    email = session.get('email')
+
+    if not email:
+        return jsonify({"error": "Not logged in as agent."}), 401
+
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
-        
-        cur.execute("DELETE FROM property WHERE property_id = %s", (property_id,))
+
+        cur.execute('''
+            DELETE FROM property
+            WHERE property_id = %s AND email = %s
+        ''', (property_id, email))
+
+        if cur.rowcount == 0:
+            return jsonify({"error": "Property not found or unauthorized."}), 404
+
         conn.commit()
-        cur.close()
-        conn.close()
-        return jsonify({"message": "Property deleted."}), 200
+        return jsonify({"message": "Property deleted."})
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Modify property
-@property_bp.route('/api/update_property/<property_id>', methods=['PUT'])
-def update_property(property_id):
-    data = request.get_json()
-    try:
-        conn = psycopg2.connect(**DB_PARAMS)
-        cur = conn.cursor()
-        
-        cur.execute("""
-            UPDATE property 
-            SET city = %s, p_state = %s, price = %s, description = %s, property_type = %s
-            WHERE property_id = %s
-        """, (
-            data['city'],
-            data['p_state'],
-            data['price'],
-            data['description'],
-            data['property_type'],
-            property_id
-        ))
-        
-        conn.commit()
-        cur.close()
-        conn.close()
-        return jsonify({"message": "Property updated."}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-
+    finally:
+        if conn:
+            conn.close()

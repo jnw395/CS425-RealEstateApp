@@ -35,6 +35,11 @@
 
   <button id="viewAgentProfileBtn" class="view-profile-btn">View Profile</button>
 
+  <a href="/manage_properties">
+    <button>Manage Properties</button>
+  </a>
+
+
   <script>
       // Handle property search
       document.getElementById('searchForm').addEventListener('submit', async (e) => {
@@ -67,7 +72,7 @@
                       <strong>Bedrooms:</strong> ${p.bedrooms ?? 'N/A'}<br>
                       <strong>Type:</strong> ${p.property_type ?? 'N/A'}<br>
                       <strong>Description:</strong> ${p.description}<br><br>
-                      <a href="/property-details/${p.property_id}" class="button-link">View Property Details</a>
+                      <a href="/agent-details/${p.property_id}" class="button-link">View Property Details</a>
                   `;
                   resultsDiv.appendChild(div);
               });
@@ -79,6 +84,11 @@
     // Redirect to agent profile page on click
     document.getElementById('viewAgentProfileBtn').addEventListener('click', () => {
       window.location.href = '/agent/view-profile';
+    });
+
+    // Redirect to manage properties page on click
+    document.getElementById('managePropertiesBtn').addEventListener('click', () => {
+      window.location.href = '/agent/manage_properties';
     });
 
   </script>
