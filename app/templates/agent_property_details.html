@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Agent Property Details</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .property { margin-bottom: 20px; }
+    .label { font-weight: bold; }
+    .booking { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+  <h2>Property Details</h2>
+  <div class="property">
+    <p><span class="label">City:</span> {{ property.city }}</p>
+    <p><span class="label">State:</span> {{ property.state }}</p>
+    <p><span class="label">Price:</span> ${{ property.price | round(2) }}</p>
+    <p><span class="label">Bedrooms:</span> {{ property.num_bedrooms }}</p>
+    <p><span class="label">Type:</span> {{ property.property_type }}</p>
+    <p><span class="label">Description:</span> {{ property.description }}</p>
+  </div>
+
+  <h3>Bookings for This Property</h3>
+  <div id="bookingList">
+    {% if bookings %}
+      {% for b in bookings %}
+        <div class="booking" id="booking-{{ b.booking_id }}">
+          <p><span class="label">Renter Email:</span> {{ b.renter_email }}</p>
+          <p><span class="label">Credit Card:</span> **** **** **** {{ b.credit_card[-4:] }}</p>
+          <p><span class="label">Start Date:</span> {{ b.start_date }}</p>
+          <p><span class="label">End Date:</span> {{ b.end_date }}</p>
+          <button onclick="deleteBooking('{{ b.booking_id }}')">Delete Booking</button>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>No bookings found for this property.</p>
+    {% endif %}
+  </div>
+
+  <a href="/agent_dash">Back to Dashboard</a>
+
+  <script>
+    function deleteBooking(bookingId) {
+      if (!confirm("Are you sure you want to delete this booking?")) return;
+
+      fetch(`/api/delete_booking/${bookingId}`, {
+        method: 'DELETE'
+      })
+      .then(response => response.json())
+      .then(data => {
+        alert(data.message || data.error);
+        if (data.message) {
+          document.getElementById(`booking-${bookingId}`).remove();
+        }
+      })
+      .catch(error => {
+        console.error("Error deleting booking:", error);
+        alert("Failed to delete booking.");
+      });
+    }
+  </script>
+
+</body>
+</html>

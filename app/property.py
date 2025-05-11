@@ -25,7 +25,8 @@ def renter_dash_page():
 # Agent dashboard connection
 @property_bp.route('/agent_dash')
 def agent_dash_page():
-    return render_template('agent_dash.html')
+    agent_id = session.get('email')
+    return render_template('agent_dash.html', agent_id=agent_id)
 
 # View bookings connection
 @property_bp.route('/view_bookings')
@@ -48,6 +49,9 @@ def search_properties():
     price_max = data.get('price_max')
     property_type = data.get('property_type')
     bedrooms = data.get('bedrooms')
+
+    role = session.get('role')  # 'agent' or 'renter'
+    email = session.get('email')
     
     try:
         conn = psycopg2.connect(**DB_PARAMS)
@@ -55,7 +59,31 @@ def search_properties():
 
         # Search for properties(filter by location and price)
         # Left join to also get num_bedrooms
-        query = """
+        if role == 'agent':
+            query = """
+                SELECT 
+                    p.property_id,
+                    p.city,
+                    p.p_state,
+                    p.price,
+                    p.description,
+                    p.property_type,
+                    COALESCE(h.num_bedrooms, a.num_bedrooms, v.num_bedrooms) AS num_bedrooms
+                FROM property p
+                LEFT JOIN house h ON p.property_id = h.property_id
+                LEFT JOIN apartments a ON p.property_id = a.property_id
+                LEFT JOIN vacation_home v ON p.property_id = v.property_id
+                WHERE p.email = %s
+                    AND (%s IS NULL OR p.city ILIKE %s)
+                    AND (%s IS NULL OR p.p_state ILIKE %s)
+                    AND (%s IS NULL OR p.price >= %s)
+                    AND (%s IS NULL OR p.price <= %s)
+                    AND (%s IS NULL OR p.property_type ILIKE %s)
+                    AND (%s IS NULL OR COALESCE(h.num_bedrooms, a.num_bedrooms, v.num_bedrooms) <= %s)
+            """
+
+        else:
+            query = """
             SELECT 
                 p.property_id,
                 p.city,
@@ -74,7 +102,8 @@ def search_properties():
               AND (%s IS NULL OR p.price <= %s)
               AND (%s IS NULL OR p.property_type ILIKE %s)
               AND (%s IS NULL OR COALESCE(h.num_bedrooms, a.num_bedrooms, v.num_bedrooms) <= %s)
-        """
+            """
+
         cur.execute(query, (
             city, f"%{city}%",
             state, f"%{state}%",
@@ -108,7 +137,6 @@ def search_properties():
 # Property details 
 @property_bp.route('/property-details/<property_id>', methods=['GET'])
 def property_details(property_id):
-    
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
@@ -144,7 +172,72 @@ def property_details(property_id):
             }
             cur.close()
             conn.close()
+
             return render_template('property_details.html', property=property_details)
+        
+        else:
+            cur.close()
+            conn.close()
+            return "Property not found", 404
+    
+    except Exception as e:
+        return jsonify({"message": f"Error: {str(e)}"}), 500
+    
+# Agent get property details
+@property_bp.route('/agent-details/<property_id>', methods=['GET'])
+def agent_property_details(property_id):
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+
+        # Query for property details
+        query_property = """
+            SELECT 
+                p.property_id,
+                p.city,
+                p.p_state,
+                p.price,
+                p.description,
+                p.property_type,
+                COALESCE(h.num_bedrooms, a.num_bedrooms, v.num_bedrooms) AS num_bedrooms
+            FROM property p
+            LEFT JOIN house h ON p.property_id = h.property_id
+            LEFT JOIN apartments a ON p.property_id = a.property_id
+            LEFT JOIN vacation_home v ON p.property_id = v.property_id
+            WHERE p.property_id = %s
+        """
+        cur.execute(query_property, (property_id))
+        property_row = cur.fetchone()
+
+        # Query for bookings related to the property
+        query_bookings = """
+            SELECT booking_id, renter_email, credit_card, start_date, end_date
+            FROM bookings
+            WHERE property_id = %s
+        """
+        cur.execute(query_bookings, (property_id,))
+        bookings = cur.fetchall()
+
+        # Process the property details
+        if property_row:
+            property_details = {
+                "property_id": property_row[0],
+                "city": property_row[1],
+                "state": property_row[2],
+                "price": float(property_row[3]),
+                "description": property_row[4],
+                "property_type": property_row[5],
+                "num_bedrooms": property_row[6]
+            }
+
+            # Close connection
+            cur.close()
+            conn.close()
+
+            # Render template with property and bookings
+            return render_template('agent_property_details.html', 
+                                   property=property_details, 
+                                   bookings=bookings)
         else:
             cur.close()
             conn.close()
@@ -261,6 +354,20 @@ def view_bookings():
 
     except Exception as e:
         return jsonify({"error": f"Error: {str(e)}"}), 500
+
+# Delete bookings
+@property_bp.route('/api/delete_booking/<int:booking_id>', methods=['DELETE'])
+def delete_booking(booking_id):
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+        cur.execute("DELETE FROM bookings WHERE booking_id = %s", (booking_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"message": "Booking deleted successfully."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # Managing properties ----------------------------------------------------------
     
