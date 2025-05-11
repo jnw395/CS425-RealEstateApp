@@ -32,7 +32,7 @@
         <form id="addCardForm">
             <input type="text" id="card_number" placeholder="Card Number" maxlength="16" required><br>
             <input type="text" id="expiration" placeholder="Expiration Date (MM/YY)" required><br>
-            <input type="int" id="cvv" placeholder="CVV" maxlength="3" required><br>
+            <input type="text" id="cvv" placeholder="CVV" maxlength="3" required><br>
 
             <h4>Billing Address</h4>
             <input type="text" id="billing_house_number" placeholder="Billing House Number" required><br>
@@ -63,36 +63,22 @@
     <button id="backToProfile">Back to Profile</button>
 
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            fetchProfile();
-            fetchCardsAndAddresses();
-            document.getElementById('backToProfile').addEventListener('click', () => {
-                window.location.href = '/view-profile';
-            });
-        });
-
         async function fetchProfile() {
             try {
-                const res = await fetch('/api/edit-profile', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload) // 'payload' is likely undefined here
-                });
-
-                const data = await res.json();
-                console.log("Response from /api/edit-profile:", data);
-
-                if (res.ok) {
-                    messageDiv.textContent = "Profile updated successfully.";
-                    messageDiv.style.color = "green";
-                } else {
-                    messageDiv.textContent = data.message || "An error occurred.";
-                    messageDiv.style.color = "red";
+                const res = await fetch('/api/profile/details'); // Adjust endpoint if needed
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    throw new Error(`Failed to fetch profile: ${res.status} - ${errorText}`);
                 }
+                const data = await res.json();
+                console.log("Profile Data:", data);
+                document.getElementById('first_name').value = data.first_name || '';
+                document.getElementById('last_name').value = data.last_name || '';
+                document.getElementById('email').value = data.email || '';
+                // Handle other profile fields as needed
             } catch (error) {
-                console.error("Error submitting profile form:", error);
-                messageDiv.textContent = "Failed to update profile. Please check your connection.";
-                messageDiv.style.color = "red";
+                console.error("Error fetching profile:", error);
+                alert("Failed to load profile information. Please check your connection.");
             }
         }
 
@@ -153,6 +139,28 @@
             }
         }
 
+        async function deleteAddress(house_number, street, city, addr_state, zip_code) {
+            try {
+                const res = await fetch('/api/delete-address', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        house_number: house_number,
+                        street: street,
+                        city: city,
+                        addr_state: addr_state,
+                        zip_code: zip_code
+                    })
+                });
+                const data = await res.json();
+                alert(data.message);
+                fetchCardsAndAddresses();
+            } catch (error) {
+                console.error("Error deleting address:", error);
+                alert("Failed to delete address. Please check your connection.");
+            }
+        }
+
         document.getElementById('profileForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const messageDiv = document.getElementById('profile_message');
@@ -160,16 +168,12 @@
             const payload = {
                 first_name: document.getElementById('first_name').value,
                 last_name: document.getElementById('last_name').value,
-                current_password: document.getElementById('current_password').value
+                current_password: document.getElementById('current_password').value,
+                new_password: document.getElementById('new_password').value // Include new password
             };
 
-            const newPassword = document.getElementById('new_password').value;
-            if (newPassword) {
-                payload.new_password = newPassword;
-            }
-
             try {
-                const res = await fetch('/api/edit-profile', {
+                const res = await fetch('/api/edit-profile', { // Ensure your Flask route handles this
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -180,6 +184,8 @@
                 if (res.ok) {
                     messageDiv.textContent = "Profile updated successfully.";
                     messageDiv.style.color = "green";
+                    document.getElementById('current_password').value = ''; // Clear password fields after success
+                    document.getElementById('new_password').value = '';
                 } else {
                     const errorText = await res.text();
                     messageDiv.textContent = data.message || errorText || "An error occurred.";
@@ -187,7 +193,7 @@
                 }
             } catch (error) {
                 console.error("Error submitting profile form:", error);
-                messageDiv.textContent = "Failed to update profile. Please check your connection.";
+                messageDiv.textContent = "Incorrect Password. Please try again.";
                 messageDiv.style.color = "red";
             }
 
@@ -244,39 +250,22 @@
 
         });
 
-        async function deleteCard(cardId) {
-            try {
-                const res = await fetch(`/api/delete-card/${cardId}`, { method: 'DELETE' });
-                const data = await res.json();
-                alert(data.message);
-                fetchCardsAndAddresses();
-            } catch (error) {
-                console.error("Error deleting card:", error);
-                alert("Failed to delete card. Please check your connection.");
-            }
-        }
-
-        async function deleteAddress(house_number, street, city, addr_state, zip_code) {
-            try {
-                const res = await fetch('/api/delete-address', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        house_number: house_number,
-                        street: street,
-                        city: city,
-                        addr_state: addr_state,
-                        zip_code: zip_code
-                    })
+        document.addEventListener("DOMContentLoaded", () => {
+            console.log('DOMContentLoaded event fired on edit-profile.html');
+            fetchProfile();
+            fetchCardsAndAddresses();
+            const backToProfileButton = document.getElementById('backToProfile');
+            console.log('backToProfileButton element:', backToProfileButton);
+            if (backToProfileButton) {
+                backToProfileButton.addEventListener('click', () => {
+                    console.log('Back to Profile button was clicked!');
+                    window.location.href = '/view-profile';
                 });
-                const data = await res.json();
-                alert(data.message);
-                fetchCardsAndAddresses();
-            } catch (error) {
-                console.error("Error deleting address:", error);
-                alert("Failed to delete address. Please check your connection.");
+                console.log('Click event listener attached to Back to Profile button.');
+            } else {
+                console.log('Back to Profile button element NOT found!');
             }
-        }
+        });
     </script>
 </body>
 </html>

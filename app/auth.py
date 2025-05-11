@@ -127,28 +127,39 @@ def edit_profile():
         return jsonify({'message': 'Invalid request format. JSON expected.'}), 400
 
     data = request.get_json()
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
 
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
 
+        # Verify current password
+        cur.execute('SELECT password FROM user_auth WHERE email = %s', (email,))
+        result = cur.fetchone()
+        if not result or result[0] != current_password:
+            cur.close()
+            conn.close()
+            return jsonify({'message': 'Incorrect current password.'}), 401
+
         # Update names in "user"
-        if 'first_name' in data:
-            cur.execute('UPDATE "user" SET first_name = %s WHERE email = %s', (data['first_name'], email))
-        if 'last_name' in data:
-            cur.execute('UPDATE "user" SET last_name = %s WHERE email = %s', (data['last_name'], email))
+        if first_name is not None:
+            cur.execute('UPDATE "user" SET first_name = %s WHERE email = %s', (first_name, email))
+        if last_name is not None:
+            cur.execute('UPDATE "user" SET last_name = %s WHERE email = %s', (last_name, email))
+
+        # Update password if a new password is provided
+        if new_password:
+            cur.execute('UPDATE user_auth SET password = %s WHERE email = %s', (new_password, email))
 
         # Handle credit card updates (for prospective_renter only)
         for card in data.get('cards_to_add', []):
             cur.execute("""
                 INSERT INTO credit_card (email, card_number, expiration_date, CVV)
                 VALUES (%s, %s, %s, %s)
-            """, (
-                email,
-                card['card_number'],
-                card['expiration_date'],
-                card['CVV']
-            ))
+            """, (email, card['card_number'], card['expiration_date'], card['CVV']))
 
         for card in data.get('cards_to_delete', []):
             cur.execute('DELETE FROM credit_card WHERE email = %s AND card_number = %s', (email, card['card_number']))
@@ -158,27 +169,13 @@ def edit_profile():
             cur.execute("""
                 INSERT INTO address (email, house_number, street, city, addr_state, zip_code)
                 VALUES (%s, %s, %s, %s, %s, %s)
-            """, (
-                email,
-                addr['house_number'],
-                addr['street'],
-                addr['city'],
-                addr['addr_state'],
-                addr['zip_code']
-            ))
+            """, (email, addr['house_number'], addr['street'], addr['city'], addr['addr_state'], addr['zip_code']))
 
         for addr in data.get('addresses_to_delete', []):
             cur.execute("""
                 DELETE FROM address
                 WHERE email = %s AND house_number = %s AND street = %s AND city = %s AND addr_state = %s AND zip_code = %s
-            """, (
-                email,
-                addr['house_number'],
-                addr['street'],
-                addr['city'],
-                addr['addr_state'],
-                addr['zip_code']
-            ))
+            """, (email, addr['house_number'], addr['street'], addr['city'], addr['addr_state'], addr['zip_code']))
 
         conn.commit()
         cur.close()
@@ -186,8 +183,13 @@ def edit_profile():
 
         return jsonify({'message': 'Profile updated successfully'})
 
+    except psycopg2.Error as pg_error:
+        if conn:
+            conn.rollback()
+        return jsonify({'message': f'Database error: {pg_error}'}), 500
     except Exception as e:
         return jsonify({'message': f'Server error: {str(e)}'}), 500
+
 
 @auth.route('/edit-profile')
 def edit_profile_page():
