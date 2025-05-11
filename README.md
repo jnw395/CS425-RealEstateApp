@@ -40,5 +40,5 @@ SECRET_KEY=<your_flask_secret_key> #generate a random string using the generate_
         
 The site can be ran from running run.py
 You can test using these provided credentials:
-Email: john.doe@example.com
-Password: password123
+* Email: john.doe@example.com
+* Password: password123
