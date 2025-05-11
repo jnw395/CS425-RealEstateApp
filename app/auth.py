@@ -194,85 +194,12 @@ def edit_profile():
 @auth.route('/edit-profile')
 def edit_profile_page():
     return send_from_directory('static', 'edit-profile.html')
-# @auth.route('/api/edit-profile', methods=['POST'])
-# def edit_profile():
-#     email = session.get('email')
-#     if not email:
-#         return jsonify({'message': 'Not logged in'}), 401
-
-#     if not request.is_json:
-#         return jsonify({'message': 'Invalid request format. JSON expected.'}), 400
-
-#     data = request.get_json()
-
-#     try:
-#         conn = psycopg2.connect(**DB_PARAMS)
-#         cur = conn.cursor()
-
-#         # Update names in "user"
-#         if 'first_name' in data:
-#             cur.execute('UPDATE "user" SET first_name = %s WHERE email = %s', (data['first_name'], email))
-#         if 'last_name' in data:
-#             cur.execute('UPDATE "user" SET last_name = %s WHERE email = %s', (data['last_name'], email))
-
-#         # Handle credit card updates (for prospective_renter only)
-#         for card in data.get('cards_to_add', []):
-#             cur.execute("""
-#                 INSERT INTO credit_card (email, card_number, expiration_date, CVV)
-#                 VALUES (%s, %s, %s, %s)
-#             """, (
-#                 email,
-#                 card['card_number'],
-#                 card['expiration_date'],
-#                 card['CVV']
-#             ))
-
-#         for card in data.get('cards_to_delete', []):
-#             cur.execute('DELETE FROM credit_card WHERE email = %s AND card_number = %s', (email, card['card_number']))
-
-#         # Handle address updates
-#         for addr in data.get('addresses_to_add', []):
-#             cur.execute("""
-#                 INSERT INTO address (email, house_number, street, city, addr_state, zip_code)
-#                 VALUES (%s, %s, %s, %s, %s, %s)
-#             """, (
-#                 email,
-#                 addr['house_number'],
-#                 addr['street'],
-#                 addr['city'],
-#                 addr['addr_state'],
-#                 addr['zip_code']
-#             ))
-
-#         for addr in data.get('addresses_to_delete', []):
-#             cur.execute("""
-#                 DELETE FROM address
-#                 WHERE email = %s AND house_number = %s AND street = %s AND city = %s AND addr_state = %s AND zip_code = %s
-#             """, (
-#                 email,
-#                 addr['house_number'],
-#                 addr['street'],
-#                 addr['city'],
-#                 addr['addr_state'],
-#                 addr['zip_code']
-#             ))
-
-#         conn.commit()
-#         cur.close()
-#         conn.close()
-
-#         return jsonify({'message': 'Profile updated successfully'})
-
-#     except Exception as e:
-#         return jsonify({'message': f'Server error: {str(e)}'}), 500
-
-
     
 
 @auth.route('/api/logout', methods=['POST'])
 def logout():
     session.clear()
-    return jsonify({"message": "Logged out"}), 200
+    return send_from_directory('static', 'login.html')
 
 #added for now just to give register the option to go to page (still needs to be implemented)
 @auth.route('/login')
@@ -391,21 +318,15 @@ def get_cards_and_addresses():
 
 @auth.route('/agent/edit-profile')
 def agent_edit_profile_page():
-    email = session.get('email')
+    email = request.args.get('email')
     if not email:
-        return jsonify({'message': 'Not logged in'}), 401
+        return redirect('/login') # Or display an error message
 
     agent_data = get_agent_profile_data(email)
     if not agent_data:
-        return "Agent not found.", 404
+        return jsonify({"message": "Agent not found."}), 404
 
-    return render_template(
-        'agent_edit_profile.html',
-        agent_data=agent_data
-    )
-
-
-
+    return render_template('agent_edit_profile.html', agent_data=agent_data)
     
 @auth.route('/agent/view-profile')
 def agent_view_profile_page():
@@ -416,8 +337,7 @@ def agent_view_profile_page():
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
-        
-        # Updated query to join "user" and "agent" tables
+
         cur.execute("""
             SELECT u.first_name, u.last_name, a.job_title, a.real_estate_agency
             FROM "user" u
@@ -431,11 +351,93 @@ def agent_view_profile_page():
         if not agent_data:
             return "Agent not found.", 404
 
-        # Pass agent data to the template
-        return render_template('agent_profile.html', agent_data=agent_data)
+        return render_template('agent_view_profile.html', agent_data=agent_data)
 
     except Exception as e:
         return f"Server error: {str(e)}", 500
+    
+@auth.route('/api/agent/profile/details')
+def get_agent_details():
+    email = session.get('email')
+    if not email:
+        return jsonify({'message': 'Not logged in'}), 401
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT u.email, u.first_name, u.last_name, a.job_title, a.real_estate_agency
+            FROM "user" u
+            JOIN agent a ON u.email = a.email
+            WHERE u.email = %s
+        """, (email,))
+        agent_data = cur.fetchone()
+        cur.close()
+        conn.close()
+        if agent_data:
+            return jsonify({
+                'email': agent_data[0],
+                'first_name': agent_data[1],
+                'last_name': agent_data[2],
+                'job_title': agent_data[3],
+                'real_estate_agency': agent_data[4]
+            })
+        return jsonify({'message': 'Agent profile not found'}), 404
+    except Exception as e:
+        return jsonify({'message': f'Server error: {str(e)}'}), 500
+
+
+@auth.route('/api/agent/edit-profile', methods=['POST'])
+def edit_agent_profile():
+    data = request.get_json()
+    current_email = data.get('current_email')
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    job_title = data.get('job_title')
+    real_estate_agency = data.get('real_estate_agency')
+
+    if not current_email or not current_password:
+        return jsonify({'message': 'Current email and password are required.'}), 400
+
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+
+        # Verify current password
+        cur.execute('SELECT password FROM user_auth WHERE email = %s', (current_email,))
+        result = cur.fetchone()
+        if not result or result[0] != current_password:
+            cur.close()
+            conn.close()
+            return jsonify({'message': 'Incorrect current password.'}), 401
+
+        # Update user details
+        if first_name is not None:
+            cur.execute('UPDATE "user" SET first_name = %s WHERE email = %s', (first_name, current_email))
+        if last_name is not None:
+            cur.execute('UPDATE "user" SET last_name = %s WHERE email = %s', (last_name, current_email))
+        if new_password:
+            cur.execute('UPDATE user_auth SET password = %s WHERE email = %s', (new_password, current_email))
+
+        # Update agent details
+        if job_title is not None:
+            cur.execute('UPDATE agent SET job_title = %s WHERE email = %s', (job_title, current_email))
+        if real_estate_agency is not None:
+            cur.execute('UPDATE agent SET real_estate_agency = %s WHERE email = %s', (real_estate_agency, current_email))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({'message': 'Agent profile updated successfully.', 'email': current_email})
+
+    except psycopg2.Error as pg_error:
+        if conn:
+            conn.rollback()
+        return jsonify({'message': f'Database error: {pg_error}'}), 500
+    except Exception as e:
+        return jsonify({'message': f'Server error: {str(e)}'}), 500
+
 
 def get_agent_profile_data(email):
     try:
@@ -747,13 +749,13 @@ def agent_dashboard():
         cur = conn.cursor()
 
         # Query the 'user' table instead of 'users'
-        cur.execute("SELECT role FROM user WHERE email = %s", (email,))
+        cur.execute("SELECT role FROM user_auth WHERE email = %s", (email,))
         user = cur.fetchone()
         cur.close()
         conn.close()
 
         if user and user[0] == 'agent':
-            return render_template('agent_dashboard.html', email=email)
+            return render_template('agent_dash.html', email=email)
 
         else:
             return redirect('/login')

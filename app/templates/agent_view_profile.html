@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Agent Profile</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        div { margin-bottom: 15px; }
+        h2 { color: #333; }
+        p { margin: 5px 0; }
+        button { padding: 10px; margin-top: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>Agent Profile</h2>
+    <div id="profile-info">
+        <p><strong>Email:</strong> <span id="email"></span></p>
+        <p><strong>First Name:</strong> <span id="first_name"></span></p>
+        <p><strong>Last Name:</strong> <span id="last_name"></span></p>
+        <p><strong>Job Title:</strong> <span id="job_title"></span></p>
+        <p><strong>Real Estate Agency:</strong> <span id="real_estate_agency"></span></p>
+    </div>
+
+    <button id="editProfileButton">Edit Profile</button>
+    <button id="backToDashboard">Back to Dashboard</button>
+    <button id="logoutButton">Logout</button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchAgentProfile();
+
+            document.getElementById('editProfileButton').addEventListener('click', () => {
+                const emailSpan = document.getElementById('email');
+                window.location.href = `/agent/edit-profile?email=${emailSpan.textContent}`;
+            });
+
+            document.getElementById('backToDashboard').addEventListener('click', () => {
+                window.location.href = '/agent-dash';
+            });
+
+            document.getElementById('logoutButton').addEventListener('click', () => {
+                window.location.href = '/login'; // Or your logout URL
+            });
+        });
+
+        async function fetchAgentProfile() {
+            try {
+                const res = await fetch('/api/agent/profile/details'); // Endpoint to get agent details from session
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    throw new Error(`Failed to fetch profile: ${res.status} - ${errorText}`);
+                }
+                const data = await res.json();
+                console.log("Fetched Agent Profile:", data);
+                document.getElementById('email').textContent = data.email || '';
+                document.getElementById('first_name').textContent = data.first_name || '';
+                document.getElementById('last_name').textContent = data.last_name || '';
+                document.getElementById('job_title').textContent = data.job_title || '';
+                document.getElementById('real_estate_agency').textContent = data.real_estate_agency || '';
+            } catch (error) {
+                console.error("Error fetching agent profile:", error);
+                alert("Failed to load agent profile information.");
+            }
+        }
+    </script>
+</body>
+</html>

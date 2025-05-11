@@ -3,75 +3,112 @@
 <head>
     <title>Edit Agent Profile</title>
     <style>
-        body { font-family: Arial; padding: 20px; }
-        input { margin: 5px 0; padding: 8px; width: 250px; }
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        input, select { margin: 5px 0; padding: 8px; width: 250px; }
         button { padding: 8px 16px; }
         .msg { margin-top: 10px; color: red; }
+        .container { margin-bottom: 20px; }
     </style>
 </head>
 <body>
     <h2>Edit Agent Profile</h2>
-    <form id="editAgentProfileForm">
-        <input type="hidden" id="current_email" required><br>
-        <input type="password" id="current_password" placeholder="Current Password" required><br>
-        <input type="text" id="first_name" placeholder="First Name"><br>
-        <input type="text" id="last_name" placeholder="Last Name"><br>
-        <input type="email" id="new_email" placeholder="New Email"><br>
-        <input type="password" id="new_password" placeholder="New Password"><br>
-        <input type="text" id="job_title" placeholder="Job Title"><br>
-        <input type="text" id="real_estate_agency" placeholder="Real Estate Agency"><br>
-        <button type="submit">Update Profile</button>
-    </form>
-    <div class="msg" id="msg"></div>
+
+    <div class="container">
+        <h3>Profile Information</h3>
+        <form id="editAgentProfileForm">
+            <input type="email" id="email" placeholder="Email" readonly><br>
+            <input type="password" id="current_password" placeholder="Current Password (Required to make changes)" required><br>
+            <input type="password" id="new_password" placeholder="New Password (Optional)"><br>
+            <input type="text" id="first_name" placeholder="First Name (Optional)"><br>
+            <input type="text" id="last_name" placeholder="Last Name (Optional)"><br>
+            <input type="text" id="job_title" placeholder="Job Title (Optional)"><br>
+            <input type="text" id="real_estate_agency" placeholder="Real Estate Agency (Optional)"><br>
+            <div id="profile_message" class="msg"></div> <br>
+            <button type="submit">Save Changes</button>
+        </form>
+    </div>
+
+    <button id="backToProfile">Back to Profile</button>
 
     <script>
-       const editAgentProfileForm = document.getElementById('editAgentProfileForm');
-        const msgElement = document.getElementById('msg');
-
-        // Get email from query parameter
-        const urlParams = new URLSearchParams(window.location.search);
-        const email = urlParams.get('email');
-        if (!email) {
-            alert("Email is required to edit profile.");
-            window.location.href = '/login';
+        async function fetchAgentProfile() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const email = urlParams.get('email');
+                if (!email) {
+                    alert("Email parameter is missing.");
+                    window.location.href = '/login'; // Or handle error appropriately
+                    return;
+                }
+                const res = await fetch(`/api/agent/profile/details?email=${email}`); // New endpoint to fetch agent details
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    throw new Error(`Failed to fetch profile: ${res.status} - ${errorText}`);
+                }
+                const data = await res.json();
+                console.log("Agent Profile Data:", data);
+                document.getElementById('email').value = data.email || '';
+                document.getElementById('first_name').value = data.first_name || '';
+                document.getElementById('last_name').value = data.last_name || '';
+                document.getElementById('job_title').value = data.job_title || '';
+                document.getElementById('real_estate_agency').value = data.real_estate_agency || '';
+            } catch (error) {
+                console.error("Error fetching agent profile:", error);
+                alert("Failed to load agent profile information.");
+            }
         }
-        document.getElementById('current_email').value = email;
 
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchAgentProfile();
 
-        editAgentProfileForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
+            document.getElementById('editAgentProfileForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const messageDiv = document.getElementById('profile_message');
+                messageDiv.textContent = '';
+                const urlParams = new URLSearchParams(window.location.search);
+                const current_email = urlParams.get('email');
+                const payload = {
+                    current_email: current_email,
+                    current_password: document.getElementById('current_password').value,
+                    new_password: document.getElementById('new_password').value,
+                    first_name: document.getElementById('first_name').value,
+                    last_name: document.getElementById('last_name').value,
+                    job_title: document.getElementById('job_title').value,
+                    real_estate_agency: document.getElementById('real_estate_agency').value
+                };
 
-            const current_email = document.getElementById('current_email').value;
-            const current_password = document.getElementById('current_password').value;
-            const first_name = document.getElementById('first_name').value;
-            const last_name = document.getElementById('last_name').value;
-            const new_email = document.getElementById('new_email').value;
-            const new_password = document.getElementById('new_password').value;
-             const job_title = document.getElementById('job_title').value;
-            const real_estate_agency = document.getElementById('real_estate_agency').value;
+                try {
+                    const res = await fetch('/api/agent/edit-profile', { // Your agent edit profile API endpoint
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
 
-            const res = await fetch('/api/agent/edit-profile', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    current_email,
-                    current_password,
-                    first_name,
-                    last_name,
-                    new_email,
-                    new_password,
-                    job_title,
-                    real_estate_agency
-                })
+                    const data = await res.json();
+                    console.log("Response from /api/agent/edit-profile:", data);
+                    if (res.ok) {
+                        messageDiv.textContent = "Profile updated successfully.";
+                        messageDiv.style.color = "green";
+                        document.getElementById('current_password').value = '';
+                        document.getElementById('new_password').value = '';
+                        // Optionally redirect back to the view profile page
+                        window.location.href = `/agent/view-profile?email=${current_email}`;
+                    } else {
+                        messageDiv.textContent = data.message || "An error occurred.";
+                        messageDiv.style.color = "red";
+                    }
+                } catch (error) {
+                    console.error("Error submitting agent profile form:", error);
+                    messageDiv.textContent = "An error occurred while updating the profile.";
+                    messageDiv.style.color = "red";
+                }
             });
 
-            const data = await res.json();
-            msgElement.innerText = data.message;
-            msgElement.style.color = res.ok ? 'green' : 'red';
-
-            if (res.ok) {
-                window.location.href = `/agent_profile.html?email=${current_email}`; // Redirect
-            }
+            document.getElementById('backToProfile').addEventListener('click', () => {
+                const urlParams = new URLSearchParams(window.location.search);
+                const email = urlParams.get('email');
+                window.location.href = `/agent/view-profile?email=${email}`;
+            });
         });
     </script>
 </body>
