@@ -38,7 +38,8 @@ DB_PORT=<your_database_port> # e.g., 5432
 SECRET_KEY=<your_flask_secret_key> #generate a random string using the generate_key.py file (for the purpose of using Flask)
 ```
         
-The site can be ran from running run.py
+The site can be ran from running run.py.
+
 You can test using these provided credentials:
 * Email: john.doe@example.com
 * Password: password123
