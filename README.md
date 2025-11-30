@@ -18,9 +18,6 @@ pip install flask
 pip install psycopg2
 ```
 ```sh
-pip install flask
-```
-```sh
 pip install datetime
 ```
 ```sh
